@@ -1,0 +1,69 @@
+html.desktop-orb-document,
+body.desktop-orb-document,
+html:has(.orb-stage),
+body:has(.orb-stage) {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+.orb-stage {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+}
+
+.orb-idle {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.orb-idle:active { cursor: grabbing; }
+
+.orb-idle img {
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 0 12px rgba(255, 216, 185, .7)) drop-shadow(0 8px 19px rgba(255, 170, 112, .56));
+  animation: orb-float 3s ease-in-out infinite;
+}
+
+.orb-card {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  border: 1px solid rgba(255, 242, 231, .45);
+  border-radius: 20px;
+  color: #fffaf5;
+  background: rgba(88, 66, 56, .91);
+  box-shadow: 0 16px 44px rgba(42, 27, 18, .32);
+  backdrop-filter: blur(20px);
+}
+
+.orb-card header { display: flex; align-items: center; justify-content: space-between; font: 600 14px "Microsoft YaHei UI", sans-serif; }
+.orb-card header button { display: grid; width: 27px; height: 27px; place-items: center; border: 0; border-radius: 8px; color: inherit; background: rgba(255,255,255,.12); }
+.orb-summary { display: flex; gap: 10px; align-items: center; margin: 9px 0; }
+.orb-summary img { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(255,184,135,.55)); }
+.orb-summary p, .orb-notice { margin: 0; font: 12px/1.5 "Microsoft YaHei UI", "Noto Sans SC", sans-serif; }
+.orb-record-button { width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 37px; border: 1px solid rgba(255,255,255,.27); border-radius: 11px; color: #4c3022; background: linear-gradient(125deg, #ffe0ca, #eea874); font: 600 13px "Microsoft YaHei UI", sans-serif; }
+.orb-card textarea { box-sizing: border-box; width: 100%; min-height: 83px; margin-top: 9px; resize: none; border: 1px solid rgba(255,255,255,.2); border-radius: 11px; padding: 9px; color: #fffdfa; background: rgba(255,255,255,.09); font: 14px/1.55 "Noto Serif SC", "Microsoft YaHei", serif; letter-spacing: .02em; }
+.orb-card textarea::placeholder { color: rgba(255,250,245,.62); }
+.orb-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 8px; }
+.orb-actions button { min-height: 30px; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; padding: 0 10px; color: #fffaf5; background: rgba(255,255,255,.09); }
+.orb-actions .orb-save { border: 0; color: #4c3022; background: linear-gradient(125deg, #ffd8be, #eaa06c); }
+.orb-notice { margin-top: 6px; color: #ffe2ce; }
+@keyframes orb-float { 50% { transform: translateY(-3px) scale(1.025); } }

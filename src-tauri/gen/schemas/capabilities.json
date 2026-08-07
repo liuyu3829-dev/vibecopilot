@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default desktop orb capability","remote":{"urls":["http://127.0.0.1:3001/*","http://localhost:3001/*"]},"local":true,"windows":["orb"],"permissions":["core:default","deep-link:default"]}}
