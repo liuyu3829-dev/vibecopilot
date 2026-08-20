@@ -34,5 +34,9 @@ export async function POST(request: Request) {
   if (!body || typeof body.transcript !== "string" || !body.transcript.trim()) return json({ error: { code: "INVALID_TRANSCRIPT", message: "Thought text is required." } }, { status: 400 });
   if (body.userId !== undefined) return json({ error: { code: "USER_ID_FORBIDDEN", message: "userId is assigned by the server." } }, { status: 400 });
   if ((body.language !== "cn" && body.language !== "en") || !isThoughtSource(body.source)) return json({ error: { code: "INVALID_INPUT", message: "Invalid thought metadata." } }, { status: 400 });
-  return json({ data: await thoughtStore.create(identity.id, { transcript: body.transcript.trim(), language: body.language, source: body.source }) }, { status: 201 });
+  try {
+    return json({ data: await thoughtStore.create(identity.id, { transcript: body.transcript.trim(), language: body.language, source: body.source }) }, { status: 201 });
+  } catch {
+    return json({ error: { code: "THOUGHT_SAVE_FAILED", message: "Unable to save this thought. Please try again." } }, { status: 502 });
+  }
 }

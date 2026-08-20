@@ -13,11 +13,9 @@
     #orb { width:92px; height:92px; padding:0; border:0; border-radius:50%; background:transparent; cursor:grab; touch-action:none; }
     #orb:active { cursor:grabbing; }
     #orb img { width:82px; height:82px; display:block; object-fit:contain; pointer-events:none; filter:drop-shadow(0 8px 15px rgba(255,164,98,.38)); animation:float 3s ease-in-out infinite; }
-    #card { display:none; width:100%; height:100%; box-sizing:border-box; padding:14px; border:1px solid rgba(255,238,227,.46); border-radius:20px; background:rgba(76,57,49,.92); box-shadow:0 16px 42px rgba(35,22,16,.34); color:#fff8f2; }
+    #card { position:relative; display:none; width:100%; height:100%; box-sizing:border-box; padding:14px; border:1px solid rgba(255,238,227,.46); border-radius:20px; background:rgba(76,57,49,.92); box-shadow:0 16px 42px rgba(35,22,16,.34); color:#fff8f2; }
     #shell.expanded #orb { display:none; }
     #shell.expanded #card { display:flex; flex-direction:column; gap:9px; }
-    .top { display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:650; }
-    .icon-button { width:28px; height:28px; border:0; border-radius:8px; color:#fff8f2; background:rgba(255,255,255,.12); cursor:pointer; }
     .summary { display:flex; align-items:center; gap:9px; min-height:50px; }
     .summary img { width:48px; height:48px; object-fit:contain; filter:drop-shadow(0 4px 8px rgba(255,182,126,.42)); }
     .summary p { margin:0; color:rgba(255,248,242,.82); font-size:12px; line-height:1.5; }
@@ -25,52 +23,51 @@
     #record-button.recording { color:#fff7f1; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.28); }
     #transcript { flex:1; min-height:75px; width:100%; box-sizing:border-box; resize:none; border:1px solid rgba(255,255,255,.2); border-radius:11px; padding:9px; color:#fffdfa; background:rgba(255,255,255,.09); outline:none; font:14px/1.55 "Noto Serif SC","Microsoft YaHei",serif; }
     #transcript::placeholder { color:rgba(255,250,245,.6); }
-    .actions { display:flex; justify-content:flex-end; gap:7px; }
-    .actions button { min-height:31px; padding:0 11px; border:1px solid rgba(255,255,255,.25); border-radius:8px; color:#fffaf5; background:rgba(255,255,255,.09); cursor:pointer; }
+    .actions { display:flex; justify-content:center; gap:7px; flex-wrap:nowrap; }
+    .actions button { box-sizing:border-box; min-height:31px; padding:0 11px; border:1px solid rgba(255,255,255,.25); border-radius:8px; color:#fffaf5; background:rgba(255,255,255,.09); cursor:pointer; white-space:nowrap; }
     .actions #save { border:0; color:#4b3022; background:linear-gradient(125deg,#ffe0c7,#eea26d); }
+    #close { position:absolute; top:10px; right:10px; display:grid; width:26px; height:26px; place-items:center; border:0; border-radius:50%; color:rgba(255,239,226,.9); background:rgba(255,244,235,.08); cursor:pointer; }
     #notice { min-height:16px; margin:0; color:#ffe2cf; font-size:11px; line-height:1.35; }
     @keyframes float { 50% { transform:translateY(-3px) scale(1.02); } }
 
     /* Selected listening-sheet direction: visual changes only; capture controls stay intact. */
     #card { padding:17px 20px 15px; border:1px solid rgba(255,226,205,.38); border-radius:24px; background:linear-gradient(142deg,rgba(112,84,69,.92),rgba(58,43,37,.95)); box-shadow:0 18px 46px rgba(27,17,13,.42),inset 0 1px rgba(255,238,225,.15); }
     #shell.expanded #card { gap:0; }
-    .top { order:1; min-height:26px; padding:0 1px; font-size:12px; font-weight:500; color:rgba(255,237,224,.7); }
-    .icon-button { width:27px; height:27px; border-radius:50%; background:rgba(255,244,235,.08); color:rgba(255,239,226,.88); }
-    .summary { order:2; flex-direction:column; justify-content:center; gap:6px; min-height:72px; padding:3px 0 0; text-align:center; }
+    .summary { order:1; flex-direction:column; justify-content:center; gap:5px; min-height:66px; padding:0; text-align:center; }
     .summary img { width:54px; height:54px; filter:drop-shadow(0 5px 13px rgba(255,177,115,.56)); }
     .summary p { max-width:230px; color:rgba(255,237,222,.8); font-size:13px; line-height:1.4; }
-    #transcript { order:3; flex:1; min-height:56px; padding:7px 12px; border:0; border-radius:0; background:transparent; color:#ffe9d9; text-align:center; font:16px/1.55 "Noto Serif SC","Microsoft YaHei",serif; }
+    #transcript { order:2; flex:1; min-height:56px; padding:7px 12px; border:0; border-radius:0; background:transparent; color:#ffe9d9; text-align:center; font:16px/1.55 "Noto Serif SC","Microsoft YaHei",serif; }
     #transcript::placeholder { color:rgba(255,229,211,.62); }
-    #record-button { order:4; align-self:center; width:auto; min-width:154px; min-height:36px; margin:2px 0 8px; padding:0 20px; border-radius:999px; box-shadow:0 8px 18px rgba(28,16,11,.2),inset 0 1px rgba(255,255,255,.6); font-size:15px; }
+    #record-button { align-self:center; box-sizing:border-box; width:128px; min-width:128px; min-height:32px; margin:0; padding:0 12px; border-radius:999px; box-shadow:0 8px 18px rgba(28,16,11,.2),inset 0 1px rgba(255,255,255,.6); font-size:13px; white-space:nowrap; }
     #record-button.recording { box-shadow:0 0 0 4px rgba(255,180,119,.14),0 8px 18px rgba(28,16,11,.24); }
-    .actions { order:5; align-items:center; justify-content:space-between; gap:9px; }
+    .actions { order:5; align-items:center; justify-content:center; gap:9px; }
     .actions button { min-height:29px; padding:0 10px; border:0; border-radius:9px; background:transparent; color:rgba(255,234,220,.62); font-size:12px; }
-    .actions #save { min-width:62px; color:#4b3022; background:linear-gradient(125deg,#ffe1ca,#eea16e); box-shadow:0 6px 14px rgba(28,16,11,.18); }
+    .actions #save { width:104px; min-width:104px; padding:0; color:#4b3022; background:rgba(255,225,202,.9); box-shadow:0 6px 14px rgba(28,16,11,.18); }
+    .actions #discard { display:grid; width:30px; min-width:30px; padding:0; place-items:center; border:1px solid rgba(255,224,205,.3); border-radius:50%; color:rgba(255,230,215,.82); }
+    .actions #discard.armed { width:auto; min-width:62px; padding:0 10px; border-radius:999px; color:#fff0e6; background:rgba(170,90,72,.45); }
     #notice { order:6; min-height:0; margin-top:4px; text-align:center; }
   
 /* Refined listening sheet: keep capture behavior intact while tightening the visual hierarchy. */
-#state { visibility:hidden; }
-.top { justify-content:flex-end; }
-.summary { min-height:82px; padding-top:7px; }
+.summary { min-height:66px; padding-top:0; }
 .summary img { width:66px; height:66px; }
 .summary p { font-size:12px; }
-#transcript { min-height:44px; max-height:65px; flex:1; overflow-y:auto; font-size:14px; line-height:1.55; }
-#voice-wave { order:4; display:block; width:100%; height:22px; margin:0 auto 4px; opacity:.9; }
-#record-button { order:5; min-width:132px; min-height:32px; margin:0 0 7px; padding:0 16px; font-size:13px; }
-.actions { order:6; }
-#notice { order:7; }
+#transcript { min-height:42px; max-height:58px; flex:1; overflow-y:auto; font-size:14px; line-height:1.55; }
+#voice-wave { order:3; display:block; width:100%; height:20px; margin:0 auto 2px; opacity:.9; }
+#notice { order:6; }
+#record-button.start { color:#4b3022; background:linear-gradient(125deg,#ffe3cf,#efa56e); }
+#record-button.start svg, #discard svg { width:17px; height:17px; }
+#record-button.resume { width:104px; min-width:104px; padding:0; border:1px solid rgba(255,226,205,.34); color:#fff1e8; background:rgba(255,239,227,.1); }
 </style>
 </head>
 <body>
   <main id="shell">
     <button id="orb" aria-label="打开桌面悬浮球"><img src="../assets/thought-space-orb-v3.png" alt=""></button>
     <section id="card" aria-label="桌面录音">
-      <div class="top"><span id="state">桌面捕捉</span><button class="icon-button" id="close" aria-label="收起">×</button></div>
+      <button id="close" type="button" aria-label="收起录音面板">×</button>
       <div class="summary"><img src="../assets/thought-space-orb-v3.png" alt=""><p id="hint">点击开始说话，即可实时记录你的想法。</p></div>
-      <button id="record-button" type="button">● 开始说话</button>
       <textarea id="transcript" placeholder="开始说话，或直接输入…" aria-label="实时转写文本"></textarea>
       <canvas id="voice-wave" width="270" height="24" aria-hidden="true"></canvas>
-      <div class="actions"><button id="cancel" type="button">关闭</button><button id="save" type="button">保存</button></div>
+      <div class="actions"><button class="start" id="record-button" type="button" aria-label="开始说话"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8 21h8"></path></svg><span>开始说话</span></button><button id="save" type="button" hidden>保存</button><button id="discard" type="button" aria-label="删除本次未保存记录" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M6 7l1 13h10l1-13"></path></svg></button></div>
       <p id="notice" role="status"></p>
     </section>
   </main>
@@ -81,8 +78,9 @@
     const recordButton = document.getElementById("record-button");
     const transcript = document.getElementById("transcript");
     const notice = document.getElementById("notice");
-    const state = document.getElementById("state");
     const hint = document.getElementById("hint");
+    const saveButton = document.getElementById("save");
+    const discardButton = document.getElementById("discard");
     const voiceWave = document.getElementById("voice-wave");
     const waveContext = voiceWave ? voiceWave.getContext("2d") : null;
     const invoke = (name, args) => {
@@ -99,6 +97,8 @@
     let socket = null;
     let confirmed = "";
     let live = "";
+    let captureRun = 0;
+    let discardArmed = false;
     let apiOrigin = "http://127.0.0.1:3001";
     let desktopToken = null;
 
@@ -109,8 +109,8 @@
       const ticket = await invoke("take_launch_ticket").catch(() => null);
       if (ticket) {
         const response = await fetch(`${apiOrigin}/api/desktop/pair/exchange`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ticket}) });
-        const result = await response.json();
-        if (!response.ok || !result.data?.token) { setNotice(result.error?.message || "桌面配对已失效，请回到网页重新打开桌面球。"); return false; }
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.data?.token) { setNotice(result?.error?.message || "桌面配对已失效，请回到网页重新打开桌面球。"); return false; }
         desktopToken = `Bearer ${result.data.token}`;
         await invoke("store_token", {token:result.data.token});
       }
@@ -121,7 +121,54 @@
       return Boolean(desktopToken);
     }
 
+    async function ensureDesktopSession() {
+      await refreshDesktopSession();
+      try {
+        const response = await fetch(`${apiOrigin}/api/thoughts`, { headers: desktopHeaders() });
+        if (response.ok) return true;
+        const result = await response.json().catch(() => null);
+        if (response.status === 401) {
+          desktopToken = null;
+          await invoke("clear_token").catch(() => null);
+          setNotice("Desktop connection expired. Return to Thought Space and choose Show desktop orb.");
+          return false;
+        }
+        setNotice(result?.error?.message || "Unable to connect to Thought Space. Please try again.");
+      } catch {
+        setNotice("Unable to connect to Thought Space. Make sure the web service is running.");
+      }
+      return false;
+    }
+
     function setNotice(value) { notice.textContent = value || ""; }
+    function renderCaptureControls() {
+      recordButton.disabled = false;
+      if (recording) {
+        recordButton.className = "recording";
+        recordButton.setAttribute("aria-label", "停止录音");
+        recordButton.innerHTML = '<span aria-hidden="true">■</span><span>停止</span>';
+        saveButton.hidden = true;
+        discardButton.hidden = true;
+        return;
+      }
+      if (transcript.value.trim()) {
+        recordButton.className = "resume";
+        recordButton.setAttribute("aria-label", "继续说话");
+        recordButton.textContent = "继续说话";
+        saveButton.hidden = false;
+        discardButton.hidden = false;
+        discardButton.classList.toggle("armed", discardArmed);
+        if (!discardArmed) discardButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M9 7l1-3h4l1 3M6 7l1 13h10l1-13"></path></svg>';
+        else discardButton.textContent = "确认删除";
+      } else {
+        discardArmed = false;
+        recordButton.className = "start";
+        recordButton.setAttribute("aria-label", "开始说话");
+        recordButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8 21h8"></path></svg><span>开始说话</span>';
+        saveButton.hidden = true;
+        discardButton.hidden = true;
+      }
+    }
     function drawWave(samples) {
       if (!waveContext || !voiceWave) return;
       const width = voiceWave.width;
@@ -141,6 +188,8 @@
 
     function resetTranscript() {
       confirmed = ""; live = ""; transcript.value = "";
+      discardArmed = false;
+      renderCaptureControls();
     }
     function clearWave() {
       if (waveContext && voiceWave) waveContext.clearRect(0, 0, voiceWave.width, voiceWave.height);
@@ -155,6 +204,7 @@
       return output.buffer;
     }
     function stop() {
+      captureRun += 1;
       if (processor) { processor.onaudioprocess = null; processor.disconnect(); processor = null; }
       if (source) { source.disconnect(); source = null; }
       if (socket) { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type:"Terminate"})); socket.close(); socket = null; }
@@ -162,10 +212,11 @@
       if (context && context.state !== "closed") context.close();
       clearWave();
       context = null; recording = false;
-      recordButton.classList.remove("recording"); recordButton.textContent = "● 开始说话";
-      state.textContent = "桌面捕捉";
+      hint.textContent = transcript.value.trim() ? "继续说话以追加内容，或保存当前记录。" : "点击开始说话，即可实时记录你的想法。";
+      renderCaptureControls();
     }
-    function addTurn(message) {
+    function addTurn(message, activeRun) {
+      if (captureRun !== activeRun) return;
       try {
         const turn = JSON.parse(message.data);
         if (turn.type !== "Turn" || !turn.transcript) return;
@@ -180,29 +231,43 @@
         transcript.value = confirmed + live;
       } catch {}
     }
-    async function start() {
-      stop(); resetTranscript(); setNotice("正在请求麦克风…");
+    async function start(initialTranscript = "") {
+      stop();
+      const activeRun = captureRun;
+      confirmed = initialTranscript; live = ""; transcript.value = initialTranscript;
+      discardArmed = false;
+      recordButton.disabled = true;
+      saveButton.hidden = true;
+      recordButton.textContent = "正在连接…";
+      setNotice("正在请求麦克风…");
       try {
-        stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        await refreshDesktopSession();
+        const media = await navigator.mediaDevices.getUserMedia({audio:true});
+        if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
+        stream = media;
+        if (!await ensureDesktopSession()) { media.getTracks().forEach(track => track.stop()); stream = null; return; }
+        if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         const response = await fetch(`${apiOrigin}/api/speech/session?language=cn`, { headers: desktopHeaders() });
         const session = await response.json();
+        if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         if (!session.data || !session.data.url) throw new Error("实时转写不可用");
-        context = new AudioContext();
-        socket = new WebSocket(session.data.url);
-        socket.onmessage = addTurn;
-        socket.onerror = () => setNotice("实时转写连接失败，请重试。");
-        socket.onopen = () => {
-          source = context.createMediaStreamSource(stream);
-          processor = context.createScriptProcessor(4096,1,1);
+        const audioContext = new AudioContext();
+        context = audioContext;
+        const webSocket = new WebSocket(session.data.url);
+        socket = webSocket;
+        webSocket.onmessage = event => addTurn(event, activeRun);
+        webSocket.onerror = () => setNotice("实时转写连接失败，请重试。");
+        webSocket.onopen = () => {
+          if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }
+          source = audioContext.createMediaStreamSource(media);
+          processor = audioContext.createScriptProcessor(4096,1,1);
           processor.onaudioprocess = event => {
             const samples = event.inputBuffer.getChannelData(0);
             drawWave(samples);
-            if (socket && socket.readyState === WebSocket.OPEN) socket.send(pcm16(samples, context.sampleRate));
+            if (socket === webSocket && webSocket.readyState === WebSocket.OPEN) webSocket.send(pcm16(samples, audioContext.sampleRate));
           };
           source.connect(processor); processor.connect(context.destination);
-          recording = true; setNotice(""); state.textContent = "正在聆听"; hint.textContent = "你的话会实时显示在下方。";
-          recordButton.classList.add("recording"); recordButton.textContent = "■ 停止录音";
+          recording = true; setNotice(""); hint.textContent = "你的话会实时显示在下方。";
+          renderCaptureControls();
         };
       } catch {
         stop(); setNotice("无法访问麦克风或启动实时转写，请检查麦克风权限。");
@@ -229,18 +294,40 @@
     orb.addEventListener("pointerup", () => { const dragged = pointer && pointer.dragged; pointer = null; if (!dragged) open(); });
     orb.addEventListener("pointercancel", () => { pointer = null; });
     void refreshDesktopSession();
-    recordButton.addEventListener("click", () => recording ? stop() : start());
+    recordButton.addEventListener("click", () => recording ? stop() : start(transcript.value));
     document.getElementById("close").addEventListener("click", collapse);
-    document.getElementById("cancel").addEventListener("click", collapse);
-    document.getElementById("save").addEventListener("click", async () => {
+    transcript.addEventListener("input", () => {
+      confirmed = transcript.value;
+      live = "";
+      discardArmed = false;
+      if (recording) {
+        stop();
+        setNotice("已保留你的修改。点击开始说话后继续录音。");
+      }
+      renderCaptureControls();
+    });
+    document.addEventListener("keydown", event => { if (event.key === "Escape") void collapse(); });
+    saveButton.addEventListener("click", async () => {
       const value = transcript.value.trim();
       if (!value) { setNotice("请先说一句或输入内容。"); return; }
       try {
-        await refreshDesktopSession();
+        if (!await ensureDesktopSession()) return;
         const response = await fetch(`${apiOrigin}/api/thoughts`, {method:"POST",headers:{"Content-Type":"application/json",...desktopHeaders()},body:JSON.stringify({transcript:value,language:"cn",source:"desktop_orb"})});
-        if (!response.ok) throw new Error();
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(result?.error?.message || "Save failed. Please try again.");
         stop(); resetTranscript(); setNotice("已保存到 Thought Space"); setTimeout(collapse,800);
-      } catch { setNotice("保存失败，请稍后重试。"); }
+      } catch (error) { setNotice(error instanceof Error ? error.message : "保存失败，请稍后重试。"); }
+    });
+    discardButton.addEventListener("click", () => {
+      if (!discardArmed) {
+        discardArmed = true;
+        setNotice("再次点击确认删除本次未保存记录。");
+        renderCaptureControls();
+        return;
+      }
+      stop();
+      resetTranscript();
+      setNotice("已删除本次未保存记录。");
     });
   </script>
 </body>

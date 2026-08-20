@@ -8,7 +8,7 @@ use url::Url;
 const IDLE_WIDTH: f64 = 92.0;
 const IDLE_HEIGHT: f64 = 92.0;
 const CARD_WIDTH: f64 = 332.0;
-const CARD_HEIGHT: f64 = 310.0;
+const CARD_HEIGHT: f64 = 240.0;
 const TOKEN_SERVICE: &str = "Thought Space Orb";
 const TOKEN_ACCOUNT: &str = "desktop-session";
 
@@ -133,6 +133,14 @@ fn store_token(token: String) -> Result<(), String> {
   keyring_entry()?.set_password(&token).map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+fn clear_token() -> Result<(), String> {
+  match keyring_entry()?.delete_credential() {
+    Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+    Err(error) => Err(error.to_string()),
+  }
+}
+
 pub fn run() {
   let mut builder = tauri::Builder::default().manage(PendingTicket(Mutex::new(None)));
   #[cfg(desktop)]
@@ -150,7 +158,9 @@ pub fn run() {
     .plugin(tauri_plugin_deep_link::init())
     .setup(|app| {
       #[cfg(any(windows, target_os = "linux"))]
-      app.deep_link().register_all()?;
+      // The installer registers the protocol. A development build may lack the
+      // registry permission to repeat that work, which must not stop the orb.
+      let _ = app.deep_link().register_all();
 
       let handle = app.handle().clone();
       if let Some(urls) = app.deep_link().get_current()? {
@@ -169,7 +179,7 @@ pub fn run() {
       open_orb(&handle, None)?;
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, take_launch_ticket, api_origin])
+    .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin])
     .run(tauri::generate_context!())
     .expect("error while running Thought Space Orb");
 }

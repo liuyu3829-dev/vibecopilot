@@ -5,6 +5,7 @@ import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import "./orb.css";
 import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, type AudioGraph } from "@/lib/audio-session";
 import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
+import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { desktopShell } from "@/lib/desktop-shell";
 
 type PointerState = { x: number; y: number; moved: boolean; timer: number | null };
@@ -69,10 +70,11 @@ export default function DesktopOrbPage() {
     };
   }, []);
 
-  const start = async () => {
+  const start = async (initialDraft = "") => {
     stop();
     const activeRun = run.current;
-    transcript.current = { confirmed: "", live: "" };
+    transcript.current = { confirmed: initialDraft, live: "" };
+    setDraft(initialDraft);
     setNotice("正在请求麦克风…");
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -87,6 +89,7 @@ export default function DesktopOrbPage() {
       audio.current = context;
       socket.current = webSocket;
       webSocket.onmessage = (event) => {
+        if (!shouldAcceptCaptureMessage(run.current, activeRun)) return;
         transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), "cn");
         setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
       };
@@ -117,6 +120,8 @@ export default function DesktopOrbPage() {
 
   const collapse = async () => {
     stop();
+    transcript.current = { confirmed: "", live: "" };
+    setDraft("");
     setExpanded(false);
     setNotice("");
     await desktopShell().resize(false);
@@ -153,6 +158,20 @@ export default function DesktopOrbPage() {
     if (!moved) void open();
   };
 
+  const updateDraft = (value: string) => {
+    if (!recording) {
+      transcript.current = { confirmed: value, live: "" };
+      setDraft(value);
+      return;
+    }
+    const next = replaceTranscriptAfterManualEdit({ run: run.current, transcript: transcript.current }, value);
+    run.current = next.run;
+    transcript.current = next.transcript;
+    setDraft(value);
+    stop();
+    setNotice("已保留你的修改。点击开始说话后继续录音。");
+  };
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!draft.trim()) { setNotice("请先录入一条想法。"); return; }
@@ -164,6 +183,7 @@ export default function DesktopOrbPage() {
       stop();
       await apiFetch(`/api/thoughts/${result.data.id}/analysis`, { method: "POST" });
       setDraft("");
+      transcript.current = { confirmed: "", live: "" };
       setNotice("已保存到 Thought Space");
       window.setTimeout(() => void collapse(), 1000);
     } catch (error) {
@@ -177,5 +197,5 @@ export default function DesktopOrbPage() {
     return <main className="orb-stage"><button className="orb-idle" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onContextMenu={(event) => event.preventDefault()} aria-label="打开桌面悬浮球"><img src="/assets/thought-space-orb-v2.png" alt="" /></button></main>;
   }
 
-  return <main className="orb-stage"><section className="orb-card"><header><span>{recording ? "正在聆听…" : "桌面捕捉"}</span><button onClick={() => void collapse()} aria-label="收起悬浮球"><X size={17} /></button></header><div className="orb-summary"><img src="/assets/thought-space-orb-v2.png" alt="" /><p>{recording ? "正在实时转写，你说的话会出现在下方。" : "点击麦克风开始说话。"}</p></div><button className="orb-record-button" type="button" onClick={() => recording ? stop() : void start()}>{recording ? <><Stop size={18} /> 停止录音</> : <><Microphone size={18} /> 开始说话</>}</button><form onSubmit={save}><textarea autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="开始说话，或直接输入…" /><div className="orb-actions"><button type="button" onClick={() => void collapse()}>关闭</button><button className="orb-save" disabled={saving}>{saving ? "保存中…" : "保存"}</button></div></form>{notice && <p className="orb-notice">{notice}</p>}</section></main>;
+  return <main className="orb-stage"><section className="orb-card"><header><span>{recording ? "正在聆听…" : "桌面捕捉"}</span><button onClick={() => void collapse()} aria-label="收起悬浮球"><X size={17} /></button></header><div className="orb-summary"><img src="/assets/thought-space-orb-v2.png" alt="" /><p>{recording ? "正在实时转写，你说的话会出现在下方。" : "点击麦克风开始说话。"}</p></div><button className="orb-record-button" type="button" onClick={() => recording ? stop() : void start(draft)}>{recording ? <><Stop size={18} /> 停止录音</> : <><Microphone size={18} /> 开始说话</>}</button><form onSubmit={save}><textarea autoFocus value={draft} onChange={(event) => updateDraft(event.target.value)} placeholder="开始说话，或直接输入…" /><div className="orb-actions"><button type="button" onClick={() => void collapse()}>关闭</button><button className="orb-save" disabled={saving}>{saving ? "保存中…" : "保存"}</button></div></form>{notice && <p className="orb-notice">{notice}</p>}</section></main>;
 }

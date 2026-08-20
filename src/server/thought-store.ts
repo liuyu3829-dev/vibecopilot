@@ -1,6 +1,7 @@
 import { createClient, type Client } from "@libsql/client";
 import { randomUUID } from "node:crypto";
 import type { ThoughtSource } from "./thought-metadata";
+import { shanghaiDateKey } from "@/lib/thought-timeline";
 
 export type AnalysisStatus = "pending" | "complete" | "failed";
 export type ThoughtLanguage = "cn" | "en";
@@ -12,9 +13,12 @@ export type Thought = {
   source: ThoughtSource;
   language: ThoughtLanguage;
   capturedAt: string;
+  capturedDay: string;
   updatedAt: string;
   summary: string | null;
   tags: string[];
+  personalTags: string[];
+  reportIncluded: boolean;
   analysisStatus: AnalysisStatus;
   deletedAt: string | null;
 };
@@ -26,6 +30,7 @@ export type ThoughtStore = {
   list(ownerId: string): Promise<Thought[]>;
   softDelete(ownerId: string, id: string): Promise<void>;
   updateTranscript(ownerId: string, id: string, transcript: string): Promise<Thought | null>;
+  updateOrganization(ownerId: string, id: string, input: { reportIncluded?: boolean; personalTags?: string[] }): Promise<Thought | null>;
   updateAnalysis(ownerId: string, id: string, analysis: { summary: string | null; tags: string[]; status: AnalysisStatus }): Promise<Thought | null>;
   close(): Promise<void>;
 };
@@ -37,9 +42,12 @@ type ThoughtRow = {
   source: ThoughtSource;
   language: ThoughtLanguage;
   captured_at: string;
+  captured_day?: string;
   updated_at: string;
   summary: string | null;
   tags: string;
+  personal_tags?: string;
+  report_included?: number;
   analysis_status: AnalysisStatus;
   deleted_at: string | null;
 };
@@ -52,9 +60,12 @@ function toThought(row: ThoughtRow): Thought {
     source: row.source,
     language: row.language,
     capturedAt: row.captured_at,
+    capturedDay: row.captured_day || shanghaiDateKey(row.captured_at),
     updatedAt: row.updated_at,
     summary: row.summary,
     tags: JSON.parse(row.tags) as string[],
+    personalTags: JSON.parse(row.personal_tags ?? "[]") as string[],
+    reportIncluded: row.report_included !== 0,
     analysisStatus: row.analysis_status,
     deletedAt: row.deleted_at,
   };
@@ -69,9 +80,12 @@ async function initialize(client: Client) {
       source TEXT NOT NULL DEFAULT 'manual',
       language TEXT NOT NULL DEFAULT 'en',
       captured_at TEXT NOT NULL DEFAULT '',
+      captured_day TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT '',
       summary TEXT,
       tags TEXT NOT NULL DEFAULT '[]',
+      personal_tags TEXT NOT NULL DEFAULT '[]',
+      report_included INTEGER NOT NULL DEFAULT 1,
       analysis_status TEXT NOT NULL DEFAULT 'pending',
       deleted_at TEXT
     )
@@ -81,9 +95,12 @@ async function initialize(client: Client) {
     ["source", "ALTER TABLE thoughts ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'"],
     ["language", "ALTER TABLE thoughts ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"],
     ["captured_at", "ALTER TABLE thoughts ADD COLUMN captured_at TEXT NOT NULL DEFAULT ''"],
+    ["captured_day", "ALTER TABLE thoughts ADD COLUMN captured_day TEXT NOT NULL DEFAULT ''"],
     ["updated_at", "ALTER TABLE thoughts ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''"],
     ["summary", "ALTER TABLE thoughts ADD COLUMN summary TEXT"],
     ["tags", "ALTER TABLE thoughts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'"],
+    ["personal_tags", "ALTER TABLE thoughts ADD COLUMN personal_tags TEXT NOT NULL DEFAULT '[]'"],
+    ["report_included", "ALTER TABLE thoughts ADD COLUMN report_included INTEGER NOT NULL DEFAULT 1"],
     ["analysis_status", "ALTER TABLE thoughts ADD COLUMN analysis_status TEXT NOT NULL DEFAULT 'pending'"],
   ] as const;
   for (const [column, sql] of migrations) if (!existing.has(column)) await client.execute(sql);
@@ -104,18 +121,21 @@ export function createLocalThoughtStore(url: string): ThoughtStore {
         source: input.source,
         language: input.language,
         capturedAt: now,
+        capturedDay: shanghaiDateKey(now),
         updatedAt: now,
         summary: null,
         tags: [],
+        personalTags: [],
+        reportIncluded: true,
         analysisStatus: "pending",
         deletedAt: null,
       };
 
       await client.execute({
         sql: `INSERT INTO thoughts (
-          id, owner_id, transcript, source, language, captured_at, updated_at,
-          summary, tags, analysis_status, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, owner_id, transcript, source, language, captured_at, captured_day, updated_at,
+          summary, tags, personal_tags, report_included, analysis_status, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           thought.id,
           thought.ownerId,
@@ -123,9 +143,12 @@ export function createLocalThoughtStore(url: string): ThoughtStore {
           thought.source,
           thought.language,
           thought.capturedAt,
+          thought.capturedDay,
           thought.updatedAt,
           thought.summary,
           JSON.stringify(thought.tags),
+          JSON.stringify(thought.personalTags),
+          thought.reportIncluded ? 1 : 0,
           thought.analysisStatus,
           thought.deletedAt,
         ],
@@ -167,6 +190,16 @@ export function createLocalThoughtStore(url: string): ThoughtStore {
 
     async close() {
       await client.close();
+    },
+
+    async updateOrganization(ownerId, id, input) {
+      await ready;
+      const current = (await this.list(ownerId)).find((thought) => thought.id === id);
+      if (!current) return null;
+      const personalTags = input.personalTags === undefined ? current.personalTags : [...new Set(input.personalTags.map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean))];
+      const reportIncluded = input.reportIncluded ?? current.reportIncluded;
+      await client.execute({ sql: "UPDATE thoughts SET personal_tags = ?, report_included = ?, updated_at = ? WHERE id = ? AND owner_id = ? AND deleted_at IS NULL", args: [JSON.stringify(personalTags), reportIncluded ? 1 : 0, new Date().toISOString(), id, ownerId] });
+      return (await this.list(ownerId)).find((thought) => thought.id === id) ?? null;
     },
   };
 }
