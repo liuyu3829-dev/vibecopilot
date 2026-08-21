@@ -19,7 +19,7 @@ For the public product, set `THOUGHT_SPACE_MODE=supabase` and `NEXT_PUBLIC_THOUG
 1. In Supabase SQL Editor, run the schema migrations in order, including `supabase/migrations/20260805_thought_space.sql`, `supabase/migrations/20260807_daily_report_modes.sql`, and `supabase/migrations/20260818_curated_daily_reports.sql`.
 2. In Supabase Authentication, enable **Anonymous sign-ins**.
 3. Configure the Supabase URL, publishable/anon key and service role key, plus the existing AssemblyAI and DeepSeek server keys, on the deployed web host. Keep service, AssemblyAI and DeepSeek keys server-only.
-4. Configure a private Cloudflare R2 bucket using `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and `R2_DESKTOP_INSTALLER_KEY`.
+4. Configure `DESKTOP_RELEASE_URL` with the public URL of the current Windows installer asset in GitHub Releases.
 
 ## Windows desktop orb release
 
@@ -30,7 +30,7 @@ $env:THOUGHT_SPACE_API_ORIGIN = "https://your-app.example.com"
 npm run desktop:pack
 ```
 
-Upload the generated `Thought Space_*.exe` to the private R2 bucket at the exact `R2_DESKTOP_INSTALLER_KEY` path. New visitors download and install the normal Windows installer directly from Settings, then use **Show orb** or **Hide orb** from the web page. The first launch creates a one-time pairing ticket; the installed app exchanges it for a secure desktop session and then saves into the same browser identity.
+Create a public GitHub Release and upload the generated `Thought Space_*.exe` as its installer asset. Copy that asset's browser-download URL into the deployed app's `DESKTOP_RELEASE_URL` environment variable. New visitors download and install the normal Windows installer directly from Settings, then use **Show orb** or **Hide orb** from the web page. The first launch creates a one-time pairing ticket; the installed app exchanges it for a secure desktop session and then saves into the same browser identity.
 ## Windows desktop orb
 
 The Windows orb uses Tauri and Windows WebView2 rather than Electron. During local development, start the web service first and then run `npm run desktop:dev`. This is only a developer workflow.

@@ -9,7 +9,7 @@ The existing orb appearance, free dragging, capture-card flow, real-time Assembl
 ## User flow
 
 1. A visitor opens Settings on the deployed Thought Space site and clicks **Download for Windows**.
-2. The web server issues a short-lived R2 download URL for the signed NSIS installer. No invite code or browser access cookie is required.
+2. The web server redirects to the public GitHub Release asset for the signed NSIS installer. No invite code or browser access cookie is required.
 3. The visitor installs `Thought Space Orb Setup.exe`. The installer registers the `thoughtspace://` protocol and offers to launch the orb after installation.
 4. On first show, the website uses one protocol launch to pair the browser's Thought Space identity with the installed app.
 5. While the desktop app remains running, **Show orb** and **Hide orb** take effect immediately without a browser protocol-confirmation dialog and without a second orb process.
@@ -21,9 +21,9 @@ Hidden means the window is hidden while the compact desktop process stays alive.
 
 ### Download delivery
 
-`GET /api/desktop/download` stays server-side and creates a five-minute signed R2 redirect. It no longer checks `DESKTOP_BETA_INVITE_CODES` or a beta cookie. The Settings invite input, prompt, beta endpoint, cookie helper, related tests, and beta-only environment variables are removed.
+`GET /api/desktop/download` stays server-side and redirects to the configured public GitHub Release asset. It no longer checks `DESKTOP_BETA_INVITE_CODES` or a beta cookie. The Settings invite input, prompt, beta endpoint, cookie helper, related tests, and beta-only environment variables are removed.
 
-The installer binary is not committed to GitHub. A release build is produced with `THOUGHT_SPACE_API_ORIGIN` set to the deployed HTTPS application URL, then uploaded to the configured private R2 bucket at `R2_DESKTOP_INSTALLER_KEY`.
+The installer binary is not committed to Git. A release build is produced with `THOUGHT_SPACE_API_ORIGIN` set to the deployed HTTPS application URL, then uploaded as an asset of a public GitHub Release. The deployed site reads its asset URL from `DESKTOP_RELEASE_URL`.
 
 ### Pairing and local control
 
@@ -59,7 +59,7 @@ The web UI must not claim that it can instantly start a fully exited native app;
 ## Verification
 
 1. Direct download has no invite field, prompt, beta cookie, or beta endpoint dependency.
-2. The download response is a short-lived R2 redirect and contains no R2 credential.
+2. The download response redirects only to the configured GitHub Release asset and contains no storage credential.
 3. A valid local secret can show and hide the same running window without a custom-protocol navigation.
 4. Invalid origin or secret cannot control the local listener.
 5. Calling show/hide repeatedly leaves exactly one `thought-space-orb` process and one `orb` window.

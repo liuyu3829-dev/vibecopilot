@@ -23,6 +23,8 @@ describe("public desktop-orb release flow", () => {
     expect(page).not.toContain("window.prompt");
     expect(downloadRoute).not.toContain("BETA_ACCESS_REQUIRED");
     expect(downloadRoute).not.toContain("desktopBetaCookieName");
+    expect(downloadRoute).not.toContain("@aws-sdk");
+    expect(downloadRoute).toContain("DESKTOP_RELEASE_URL");
   });
 
   it("gives the bundled orb a remote API origin and a one-time pairing ticket", () => {
