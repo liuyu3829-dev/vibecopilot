@@ -11,7 +11,18 @@ describe("public desktop-orb release flow", () => {
   it("pairs the installed orb with the current browser identity before showing it", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
     expect(page).toContain('fetch("/api/desktop/pair"');
-    expect(page).toContain("desktopLaunchUrl(ticket)");
+    expect(page).toContain("desktopLaunchUrl(ticket, controlSecret)");
+    expect(page).toContain("localStorage.setItem(\"thought-space-orb-control\"");
+  });
+
+  it("offers a direct public installer download without an invite-code prompt", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+    const downloadRoute = readFileSync(resolve(process.cwd(), "src/app/api/desktop/download/route.ts"), "utf8");
+
+    expect(page).not.toContain("desktopInvite");
+    expect(page).not.toContain("window.prompt");
+    expect(downloadRoute).not.toContain("BETA_ACCESS_REQUIRED");
+    expect(downloadRoute).not.toContain("desktopBetaCookieName");
   });
 
   it("gives the bundled orb a remote API origin and a one-time pairing ticket", () => {
@@ -22,5 +33,6 @@ describe("public desktop-orb release flow", () => {
     expect(shell).toContain('Authorization: desktopToken');
     expect(native).toContain("fn take_launch_ticket");
     expect(native).toContain("fn api_origin");
+    expect(native).toContain("start_control_listener");
   });
 });

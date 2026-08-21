@@ -1,8 +1,5 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { cookies } from "next/headers";
-
-import { desktopBetaCookieName, hasBetaAccess } from "@/server/desktop-beta";
 
 export const runtime = "nodejs";
 
@@ -15,10 +12,6 @@ function r2Client() {
 }
 
 export async function GET() {
-  const cookieStore = await cookies();
-  if (!hasBetaAccess(cookieStore.get(desktopBetaCookieName)?.value, process.env.DESKTOP_BETA_COOKIE_SECRET)) {
-    return Response.json({ error: { code: "BETA_ACCESS_REQUIRED", message: "Enter a desktop beta invite code first." } }, { status: 403 });
-  }
   const client = r2Client();
   const bucket = process.env.R2_BUCKET;
   const key = process.env.R2_DESKTOP_INSTALLER_KEY;

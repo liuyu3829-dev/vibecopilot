@@ -16,7 +16,8 @@ For project-wide ownership, API, data, and future calendar/login isolation rules
 ## Technical boundary
 
 - The desktop app is the only owner of native window visibility, dragging, and size.
-- The web dashboard requests `thoughtspace://open-orb` or `thoughtspace://hide-orb`; it does not create a second desktop window.
+- The web dashboard uses the authenticated loopback control bridge to show or hide an already-running orb; it does not create a second desktop window.
+- `thoughtspace://open-orb` is reserved for a first launch or a fully exited desktop app, where Windows may require the browser to confirm the native launch.
 - The desktop app keeps its current process alive while hidden, so opening a hidden orb is a show/focus operation rather than an application launch.
 - Real-time transcription and saving continue to use the existing `/api/speech/session` and `/api/thoughts` paths.
 

@@ -1,4 +1,12 @@
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{
+  fs,
+  io::{ErrorKind, Read, Write},
+  net::{TcpListener, TcpStream},
+  path::PathBuf,
+  sync::Mutex,
+  thread,
+  time::Duration,
+};
 
 use keyring::Entry;
 use tauri::{AppHandle, LogicalSize, Manager, Size, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -11,11 +19,13 @@ const CARD_WIDTH: f64 = 332.0;
 const CARD_HEIGHT: f64 = 240.0;
 const TOKEN_SERVICE: &str = "Thought Space Orb";
 const TOKEN_ACCOUNT: &str = "desktop-session";
+const CONTROL_ACCOUNT: &str = "desktop-control";
+const CONTROL_PORT: u16 = 17894;
 
 struct PendingTicket(Mutex<Option<String>>);
 
 enum OrbAction {
-  Show(Option<String>),
+  Show(Option<String>, Option<String>),
   Hide,
 }
 
@@ -39,13 +49,17 @@ fn orb_action_from_url(url: &Url) -> Option<OrbAction> {
   match url.host_str() {
     Some("open-orb") => Some(OrbAction::Show(
       url.query_pairs().find(|(name, _)| name == "ticket").map(|(_, value)| value.into_owned()),
+      url.query_pairs().find(|(name, _)| name == "control").map(|(_, value)| value.into_owned()),
     )),
     Some("hide-orb") => Some(OrbAction::Hide),
     _ => None,
   }
 }
 
-fn open_orb(app: &AppHandle, ticket: Option<String>) -> Result<(), String> {
+fn open_orb(app: &AppHandle, ticket: Option<String>, control_secret: Option<String>) -> Result<(), String> {
+  if let Some(control_secret) = control_secret {
+    store_control_secret(&control_secret)?;
+  }
   if let Some(ticket) = ticket {
     *app.state::<PendingTicket>().0.lock().map_err(|error| error.to_string())? = Some(ticket);
   }
@@ -83,7 +97,7 @@ fn hide_orb(app: &AppHandle) -> Result<(), String> {
 
 fn handle_orb_url(app: &AppHandle, url: &Url) -> Result<(), String> {
   match orb_action_from_url(url) {
-    Some(OrbAction::Show(ticket)) => open_orb(app, ticket),
+    Some(OrbAction::Show(ticket, control_secret)) => open_orb(app, ticket, control_secret),
     Some(OrbAction::Hide) => hide_orb(app),
     None => Ok(()),
   }
@@ -113,6 +127,75 @@ fn keyring_entry() -> Result<Entry, String> {
   Entry::new(TOKEN_SERVICE, TOKEN_ACCOUNT).map_err(|error| error.to_string())
 }
 
+fn control_keyring_entry() -> Result<Entry, String> {
+  Entry::new(TOKEN_SERVICE, CONTROL_ACCOUNT).map_err(|error| error.to_string())
+}
+
+fn store_control_secret(secret: &str) -> Result<(), String> {
+  control_keyring_entry()?.set_password(secret).map_err(|error| error.to_string())
+}
+
+fn stored_control_secret() -> Option<String> {
+  control_keyring_entry().ok()?.get_password().ok()
+}
+
+fn api_origin_value() -> String {
+  option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or("http://127.0.0.1:3001").trim_end_matches('/').to_string()
+}
+
+fn allowed_control_origin(origin: &str) -> bool {
+  origin == api_origin_value() || (cfg!(debug_assertions) && origin == "http://localhost:3001")
+}
+
+fn secrets_match(expected: &str, received: &str) -> bool {
+  if expected.len() != received.len() { return false; }
+  expected.bytes().zip(received.bytes()).fold(0_u8, |difference, (left, right)| difference | (left ^ right)) == 0
+}
+
+fn write_control_response(stream: &mut TcpStream, status: &str, origin: Option<&str>) {
+  let cors = origin.filter(|value| allowed_control_origin(value)).map(|value| format!(
+    "Access-Control-Allow-Origin: {value}\r\nAccess-Control-Allow-Methods: POST, OPTIONS\r\nAccess-Control-Allow-Headers: X-Thought-Space-Orb-Control\r\nAccess-Control-Allow-Private-Network: true\r\nAccess-Control-Max-Age: 600\r\n"
+  )).unwrap_or_default();
+  let response = format!("HTTP/1.1 {status}\r\n{cors}Content-Length: 0\r\nConnection: close\r\n\r\n");
+  let _ = stream.write_all(response.as_bytes());
+}
+
+fn handle_control_connection(mut stream: TcpStream, app: &AppHandle) {
+  let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+  let mut bytes = [0_u8; 8_192];
+  let length = match stream.read(&mut bytes) { Ok(length) if length > 0 => length, _ => return };
+  let request = match std::str::from_utf8(&bytes[..length]) { Ok(request) => request, Err(_) => { write_control_response(&mut stream, "400 Bad Request", None); return; } };
+  let mut lines = request.split("\r\n");
+  let request_line = lines.next().unwrap_or_default();
+  let mut origin = None;
+  let mut secret = None;
+  for line in lines {
+    if let Some(value) = line.strip_prefix("Origin: ").or_else(|| line.strip_prefix("origin: ")) { origin = Some(value.trim()); }
+    if let Some(value) = line.strip_prefix("X-Thought-Space-Orb-Control: ").or_else(|| line.strip_prefix("x-thought-space-orb-control: ")) { secret = Some(value.trim()); }
+  }
+  let Some(origin) = origin else { write_control_response(&mut stream, "403 Forbidden", None); return; };
+  if !allowed_control_origin(origin) { write_control_response(&mut stream, "403 Forbidden", None); return; }
+  if request_line.starts_with("OPTIONS ") { write_control_response(&mut stream, "204 No Content", Some(origin)); return; }
+  let Some(expected) = stored_control_secret() else { write_control_response(&mut stream, "401 Unauthorized", Some(origin)); return; };
+  if !secret.is_some_and(|value| secrets_match(&expected, value)) { write_control_response(&mut stream, "401 Unauthorized", Some(origin)); return; }
+  let result = if request_line.starts_with("POST /v1/orb/show ") { open_orb(app, None, None) } else if request_line.starts_with("POST /v1/orb/hide ") { hide_orb(app) } else { write_control_response(&mut stream, "404 Not Found", Some(origin)); return; };
+  write_control_response(&mut stream, if result.is_ok() { "204 No Content" } else { "500 Internal Server Error" }, Some(origin));
+}
+
+fn start_control_listener(app: AppHandle) {
+  thread::spawn(move || {
+    let listener = match TcpListener::bind(("127.0.0.1", CONTROL_PORT)) { Ok(listener) => listener, Err(_) => return };
+    let _ = listener.set_nonblocking(true);
+    loop {
+      match listener.accept() {
+        Ok((stream, _)) => handle_control_connection(stream, &app),
+        Err(error) if error.kind() == ErrorKind::WouldBlock => thread::sleep(Duration::from_millis(40)),
+        Err(_) => break,
+      }
+    }
+  });
+}
+
 #[tauri::command]
 fn take_launch_ticket(state: State<PendingTicket>) -> Result<Option<String>, String> {
   state.0.lock().map_err(|error| error.to_string()).map(|mut ticket| ticket.take())
@@ -120,7 +203,7 @@ fn take_launch_ticket(state: State<PendingTicket>) -> Result<Option<String>, Str
 
 #[tauri::command]
 fn api_origin() -> String {
-  option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or("http://127.0.0.1:3001").trim_end_matches('/').to_string()
+  api_origin_value()
 }
 
 #[tauri::command]
@@ -138,6 +221,24 @@ fn clear_token() -> Result<(), String> {
   match keyring_entry()?.delete_credential() {
     Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
     Err(error) => Err(error.to_string()),
+  }
+}
+
+#[cfg(test)]
+mod control_bridge_tests {
+  use super::{allowed_control_origin, api_origin_value, secrets_match};
+
+  #[test]
+  fn only_the_packaged_web_origin_is_allowed_to_control_the_orb() {
+    assert!(allowed_control_origin(&api_origin_value()));
+    assert!(!allowed_control_origin("https://untrusted.example"));
+  }
+
+  #[test]
+  fn control_secret_requires_an_exact_match() {
+    assert!(secrets_match("desktop-control-secret", "desktop-control-secret"));
+    assert!(!secrets_match("desktop-control-secret", "desktop-control-secrex"));
+    assert!(!secrets_match("desktop-control-secret", "desktop-control"));
   }
 }
 
@@ -176,7 +277,8 @@ pub fn run() {
         }
       });
 
-      open_orb(&handle, None)?;
+      start_control_listener(handle.clone());
+      open_orb(&handle, None, None)?;
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin])

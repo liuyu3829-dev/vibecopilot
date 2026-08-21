@@ -22,7 +22,7 @@ import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type Transcrip
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { localDateKey } from "@/lib/thought-timeline";
 import { splitTranscriptForReading } from "@/lib/transcript-display";
-import { desktopControlUrl, desktopLaunchUrl } from "@/desktop/launch";
+import { desktopLaunchUrl } from "@/desktop/launch";
 import { shouldRequireAuth } from "./auth-mode";
 
 type Locale = "zh-CN" | "en";
@@ -130,7 +130,6 @@ export default function Home() {
   const [discardArmed, setDiscardArmed] = useState(false);
   const [voiceCaptured, setVoiceCaptured] = useState(false);
   const [notice, setNotice] = useState("");
-  const [desktopInvite, setDesktopInvite] = useState("");
   const [section, setSection] = useState<Section>("thoughts");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [tagDrafts, setTagDrafts] = useState<Record<string, string>>({});
@@ -335,30 +334,38 @@ export default function Home() {
     setTagDrafts((drafts) => ({ ...drafts, [thought.id]: "" }));
   };
 
-  const downloadDesktopPet = async () => {
-    const code = window.prompt(locale === "zh-CN" ? "输入桌面球测试邀请码" : "Enter your desktop orb invite code");
-    if (!code) return;
+  const downloadDesktopPet = () => window.location.assign("/api/desktop/download");
+
+  const requestLocalOrbControl = async (action: "show" | "hide") => {
+    const controlSecret = window.localStorage.getItem("thought-space-orb-control");
+    if (!controlSecret) return "unpaired" as const;
     try {
-      const response = await fetch("/api/desktop/beta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error?.message ?? "Download access was not granted.");
-      window.location.assign("/api/desktop/download");
-    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to start the download."); }
+      const response = await fetch(`http://127.0.0.1:17894/v1/orb/${action}`, {
+        method: "POST",
+        headers: { "X-Thought-Space-Orb-Control": controlSecret },
+      });
+      if (response.ok) return "ok" as const;
+      if (response.status === 401 || response.status === 403) window.localStorage.removeItem("thought-space-orb-control");
+      return "offline" as const;
+    } catch { return "offline" as const; }
   };
 
   const controlDesktopPet = async (action: "show" | "hide") => {
-    if (action === "hide") { window.location.assign(desktopControlUrl("hide")); return; }
-    let launchUrl = desktopControlUrl("show");
-    if (shouldRequireAuth()) {
-      try {
-        const response = await fetch("/api/desktop/pair", { method: "POST" });
-        const result = await response.json();
-        const ticket = result.data?.ticket;
-        if (!response.ok || !ticket) throw new Error(result.error?.message ?? "Unable to pair the desktop orb.");
-        launchUrl = desktopLaunchUrl(ticket);
-      } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to pair the desktop orb."); return; }
+    const status = await requestLocalOrbControl(action);
+    if (status === "ok") { setNotice(""); return; }
+    if (action === "hide") {
+      setNotice(locale === "zh-CN" ? "桌面球当前未运行。显示桌面球即可重新启动。" : "The desktop orb is not running. Choose Show orb to start it.");
+      return;
     }
-    window.location.assign(launchUrl);
+    try {
+      const response = await fetch("/api/desktop/pair", { method: "POST" });
+      const result = await response.json();
+      const ticket = result.data?.ticket;
+      const controlSecret = result.data?.controlSecret;
+      if (!response.ok || !ticket || !controlSecret) throw new Error(result.error?.message ?? "Unable to pair the desktop orb.");
+      window.localStorage.setItem("thought-space-orb-control", controlSecret);
+      window.location.assign(desktopLaunchUrl(ticket, controlSecret));
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to pair the desktop orb."); }
   };
   const generateReport = async (outputLocale = reportLocale, outputMode = reportMode, outputLength = postLength) => {
     setNotice(t.loading);
@@ -423,7 +430,7 @@ export default function Home() {
         {section === "tags" && <TagBrowser locale={locale} tags={personalTags} activeTag={activeTag} onSelect={setActiveTag} thoughts={taggedThoughts} />}
         {section === "settings" ? <section className="desktop-settings">
           <div className="desktop-settings-heading"><Image src="/assets/thought-space-orb-v3.png" alt="" width={72} height={72} /><div><p className="eyebrow">{locale === "zh-CN" ? "桌面端" : "DESKTOP COMPANION"}</p><h2>{locale === "zh-CN" ? "桌面球" : "Desktop orb"}</h2><p>{locale === "zh-CN" ? "下载、显示或隐藏你的桌面捕捉球。" : "Download, show or hide your desktop capture orb."}</p></div></div>
-          <div className="desktop-settings-card"><div><h3>{locale === "zh-CN" ? "安装桌面球" : "Install the desktop orb"}</h3><p>{locale === "zh-CN" ? "首次安装时输入测试邀请码；安装后无需重复下载。" : "Enter an invite code for the first installation. You will not need to download it again."}</p></div><label>{locale === "zh-CN" ? "测试邀请码" : "Invite code"}<input aria-label="Desktop orb invite code" value={desktopInvite} onChange={(event) => setDesktopInvite(event.target.value)} placeholder={locale === "zh-CN" ? "输入邀请码" : "Enter invite code"} /></label><button className="desktop-pet" type="button" onClick={() => void downloadDesktopPet()}>{locale === "zh-CN" ? "下载 Windows 版" : "Download for Windows"}</button></div>
+          <div className="desktop-settings-card"><div><h3>{locale === "zh-CN" ? "安装桌面球" : "Install the desktop orb"}</h3><p>{locale === "zh-CN" ? "下载并安装一次，即可从网页显示或隐藏桌面球。" : "Download and install once, then show or hide the orb from the web."}</p></div><button className="desktop-pet" type="button" onClick={downloadDesktopPet}>{locale === "zh-CN" ? "下载 Windows 版" : "Download for Windows"}</button></div>
           <div className="desktop-settings-card desktop-settings-actions"><div><h3>{locale === "zh-CN" ? "显示状态" : "Visibility"}</h3><p>{locale === "zh-CN" ? "已安装后，可随时快速显示或隐藏桌面球。" : "After installation, show or hide the orb instantly."}</p></div><span><button className="desktop-pet" type="button" onClick={() => void controlDesktopPet("show")}>{locale === "zh-CN" ? "显示桌面球" : "Show orb"}</button><button className="desktop-pet desktop-pet-hide" type="button" onClick={() => void controlDesktopPet("hide")}>{locale === "zh-CN" ? "隐藏桌面球" : "Hide orb"}</button></span></div>
           {shouldRequireAuth() && process.env.NODE_ENV !== "production" && <div className="desktop-settings-card desktop-settings-actions"><div><h3>{locale === "zh-CN" ? "迁移本地数据" : "Migrate local data"}</h3><p>{locale === "zh-CN" ? "将此电脑旧版 SQLite 中的想法和日报复制到当前私密云端空间。本地备份不会删除。" : "Copy thoughts and reports from this computer's previous SQLite database into this private cloud space. Your local backup stays untouched."}</p></div><span><button className="desktop-pet" type="button" onClick={() => void migrateLocalData()}>{locale === "zh-CN" ? "开始迁移" : "Migrate local data"}</button></span></div>}
         </section> : section === "reports" ? <section className="report-center">

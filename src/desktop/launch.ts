@@ -1,11 +1,9 @@
-export type DesktopControl = "show" | "hide";
-
-export function desktopControlUrl(action: DesktopControl) {
-  return action === "show" ? "thoughtspace://open-orb" : "thoughtspace://hide-orb";
-}
-
-export function desktopLaunchUrl(ticket?: string) {
-  return `thoughtspace://open-orb${ticket ? `?ticket=${encodeURIComponent(ticket)}` : ""}`;
+export function desktopLaunchUrl(ticket?: string, controlSecret?: string) {
+  const params = new URLSearchParams();
+  if (ticket) params.set("ticket", ticket);
+  if (controlSecret) params.set("control", controlSecret);
+  const query = params.toString();
+  return `thoughtspace://open-orb${query ? `?${query}` : ""}`;
 }
 
 export function desktopDownloadUrl() {
