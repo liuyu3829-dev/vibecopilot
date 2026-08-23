@@ -67,6 +67,7 @@ fn orb_action_from_url(url: &Url) -> Option<OrbAction> {
 }
 
 fn open_orb(app: &AppHandle, ticket: Option<String>, control_secret: Option<String>) -> Result<(), String> {
+  let refresh_shell = ticket.is_some();
   if let Some(control_secret) = control_secret {
     store_control_secret(&control_secret)?;
   }
@@ -74,6 +75,9 @@ fn open_orb(app: &AppHandle, ticket: Option<String>, control_secret: Option<Stri
     *app.state::<PendingTicket>().0.lock().map_err(|error| error.to_string())? = Some(ticket);
   }
   if let Some(window) = app.get_webview_window("orb") {
+    if refresh_shell {
+      window.eval("window.location.reload();").map_err(|error| error.to_string())?;
+    }
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
     return Ok(());

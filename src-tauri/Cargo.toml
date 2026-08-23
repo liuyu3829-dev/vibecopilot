@@ -1,6 +1,6 @@
 [package]
 name = "thought-space-orb"
-version = "0.1.4"
+version = "0.1.5"
 description = "Thought Space desktop orb"
 edition = "2021"
 

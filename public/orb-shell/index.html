@@ -117,7 +117,12 @@
       if (ticket) {
         const response = await desktopApi("/api/desktop/pair/exchange", { method:"POST", body:JSON.stringify({ticket}) });
         const result = response.data;
-        if (!response.ok || !result?.data?.token) { setNotice(result?.error?.message || "桌面配对已失效，请回到网页重新打开桌面球。"); return false; }
+        if (!response.ok || !result?.data?.token) {
+          desktopToken = null;
+          await invoke("clear_token").catch(() => undefined);
+          setNotice(result?.error?.message || "桌面配对已失效，请回到网页重新打开桌面球。");
+          return false;
+        }
         desktopToken = `Bearer ${result.data.token}`;
         await invoke("store_token", {token:result.data.token});
       }
@@ -129,7 +134,7 @@
     }
 
     async function ensureDesktopSession() {
-      await refreshDesktopSession();
+      if (!await refreshDesktopSession()) return false;
       try {
         const response = await desktopApi("/api/thoughts");
         if (response.ok) return true;

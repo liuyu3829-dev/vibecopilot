@@ -22,7 +22,7 @@ import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type Transcrip
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { localDateKey } from "@/lib/thought-timeline";
 import { splitTranscriptForReading } from "@/lib/transcript-display";
-import { desktopLaunchUrl } from "@/desktop/launch";
+import { desktopHideUrl, desktopLaunchUrl } from "@/desktop/launch";
 import { shouldRequireAuth } from "./auth-mode";
 
 type Locale = "zh-CN" | "en";
@@ -336,33 +336,19 @@ export default function Home() {
 
   const downloadDesktopPet = () => window.location.assign("/api/desktop/download");
 
-  const requestLocalOrbControl = async (action: "show" | "hide") => {
-    const controlSecret = window.localStorage.getItem("thought-space-orb-control");
-    if (!controlSecret) return "unpaired" as const;
-    try {
-      const response = await fetch(`http://127.0.0.1:17894/v1/orb/${action}`, {
-        method: "POST",
-        headers: { "X-Thought-Space-Orb-Control": controlSecret },
-      });
-      if (response.ok) return "ok" as const;
-      if (response.status === 401 || response.status === 403) window.localStorage.removeItem("thought-space-orb-control");
-      return "offline" as const;
-    } catch { return "offline" as const; }
-  };
-
   const controlDesktopPet = async (action: "show" | "hide") => {
-    const status = await requestLocalOrbControl(action);
-    if (status === "ok") { setNotice(""); return; }
     if (action === "hide") {
-      setNotice(locale === "zh-CN" ? "桌面球当前未运行。显示桌面球即可重新启动。" : "The desktop orb is not running. Choose Show orb to start it.");
+      const controlSecret = window.localStorage.getItem("thought-space-orb-control") ?? undefined;
+      window.location.assign(desktopHideUrl(controlSecret));
+      setNotice("");
       return;
     }
     try {
       const response = await fetch("/api/desktop/pair", { method: "POST" });
-      const result = await response.json();
-      const ticket = result.data?.ticket;
-      const controlSecret = result.data?.controlSecret;
-      if (!response.ok || !ticket || !controlSecret) throw new Error(result.error?.message ?? "Unable to pair the desktop orb.");
+      const result = await response.json().catch(() => null) as { data?: { ticket?: string; controlSecret?: string }; error?: { message?: string } } | null;
+      const ticket = result?.data?.ticket;
+      const controlSecret = result?.data?.controlSecret;
+      if (!response.ok || !ticket || !controlSecret) throw new Error(result?.error?.message ?? "Unable to pair the desktop orb.");
       window.localStorage.setItem("thought-space-orb-control", controlSecret);
       window.location.assign(desktopLaunchUrl(ticket, controlSecret));
     } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to pair the desktop orb."); }

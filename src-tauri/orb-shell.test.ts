@@ -3,6 +3,20 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("bundled desktop orb shell", () => {
+  it("refreshes an already running orb when a new pairing ticket is supplied", () => {
+    const source = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+
+    expect(source).toContain("let refresh_shell = ticket.is_some();");
+    expect(source).toContain('window.eval("window.location.reload();")');
+  });
+
+  it("stops session validation when refreshing the desktop pairing fails", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain("if (!await refreshDesktopSession()) return false;");
+    expect(page).toContain("desktopToken = null;");
+  });
+
   it("opens a local Tauri page instead of the remote dashboard", () => {
     const source = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
 
