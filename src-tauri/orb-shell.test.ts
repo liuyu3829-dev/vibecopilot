@@ -40,6 +40,14 @@ describe("bundled desktop orb shell", () => {
     expect(source).toContain('window.show()');
   });
 
+  it("stores a first-time web control secret before honoring a protocol hide request", () => {
+    const source = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+
+    expect(source).toContain('Some("hide-orb") => Some(OrbAction::Hide(');
+    expect(source).toContain("Some(OrbAction::Hide(control_secret))");
+    expect(source).toContain("if let Some(control_secret) = control_secret {\n    store_control_secret(&control_secret)?;");
+  });
+
   it("uses the Windows GUI subsystem so protocol controls never show a terminal", () => {
     const source = readFileSync(resolve(process.cwd(), "src-tauri/src/main.rs"), "utf8");
 
@@ -105,8 +113,35 @@ describe("bundled desktop orb shell", () => {
 
     expect(page).toContain("async function ensureDesktopSession()");
     expect(page).toContain('if (!await ensureDesktopSession()) return;');
-    expect(page).toContain("const result = await response.json().catch(() => null);");
+    expect(page).toContain("const result = response.data;");
     expect(page).toContain('await invoke("clear_token")');
     expect(native).toContain("fn clear_token()");
+  });
+
+  it("routes Thought Space API calls through the native HTTPS bridge", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+    const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+
+    expect(page).toContain('invoke("desktop_api_request"');
+    expect(page).not.toContain('fetch(`${apiOrigin}/api/thoughts`');
+    expect(native).toContain("async fn desktop_api_request(");
+    expect(native).toContain("fn desktop_api_url(path: &str)");
+  });
+
+  it("gives installed users a network hint instead of asking them to start a local web service", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain("无法连接 Thought Space，请检查网络或稍后重试。");
+    expect(page).not.toContain("Make sure the web service is running.");
+  });
+
+  it("uses the Windows system proxy configuration and surfaces native connection errors", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+    const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+
+    expect(native).toContain("reqwest::Client::builder().build()");
+    expect(native).not.toContain("reqwest::Client::builder().no_proxy().build()");
+    expect(page).toContain("catch (error)");
+    expect(page).toContain("error instanceof Error ? error.message");
   });
 });

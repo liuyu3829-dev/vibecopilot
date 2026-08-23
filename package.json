@@ -1,6 +1,6 @@
 {
     "name": "thought-space-web",
-    "version": "0.1.0",
+  "version": "0.1.4",
     "private": true,
     "scripts": {
         "dev": "next dev --port 3001",
@@ -10,7 +10,7 @@
         "test": "vitest run",
         "typecheck": "tsc --noEmit",
         "desktop:dev": "tauri dev",
-        "desktop:pack": "tauri build"
+        "desktop:pack": "set \"THOUGHT_SPACE_API_ORIGIN=https://vibecopilot-xi.vercel.app\" && tauri build"
     },
     "dependencies": {
         "@libsql/client": "^0.17.4",

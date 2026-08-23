@@ -99,17 +99,24 @@
     let live = "";
     let captureRun = 0;
     let discardArmed = false;
-    let apiOrigin = "http://127.0.0.1:3001";
     let desktopToken = null;
 
-    const desktopHeaders = () => desktopToken ? { Authorization: desktopToken } : {};
+    async function desktopApi(path, options = {}) {
+      const response = await invoke("desktop_api_request", {
+        path,
+        method: options.method || "GET",
+        body: options.body || null,
+        authorization: desktopToken,
+      });
+      let data = null;
+      try { data = JSON.parse(response.body); } catch {}
+      return { ok: response.status >= 200 && response.status < 300, status: response.status, data };
+    }
     async function refreshDesktopSession() {
-      const origin = await invoke("api_origin").catch(() => null);
-      if (typeof origin === "string" && origin) apiOrigin = origin.replace(/\/$/, "");
       const ticket = await invoke("take_launch_ticket").catch(() => null);
       if (ticket) {
-        const response = await fetch(`${apiOrigin}/api/desktop/pair/exchange`, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ticket}) });
-        const result = await response.json().catch(() => null);
+        const response = await desktopApi("/api/desktop/pair/exchange", { method:"POST", body:JSON.stringify({ticket}) });
+        const result = response.data;
         if (!response.ok || !result?.data?.token) { setNotice(result?.error?.message || "桌面配对已失效，请回到网页重新打开桌面球。"); return false; }
         desktopToken = `Bearer ${result.data.token}`;
         await invoke("store_token", {token:result.data.token});
@@ -124,9 +131,9 @@
     async function ensureDesktopSession() {
       await refreshDesktopSession();
       try {
-        const response = await fetch(`${apiOrigin}/api/thoughts`, { headers: desktopHeaders() });
+        const response = await desktopApi("/api/thoughts");
         if (response.ok) return true;
-        const result = await response.json().catch(() => null);
+        const result = response.data;
         if (response.status === 401) {
           desktopToken = null;
           await invoke("clear_token").catch(() => null);
@@ -134,8 +141,8 @@
           return false;
         }
         setNotice(result?.error?.message || "Unable to connect to Thought Space. Please try again.");
-      } catch {
-        setNotice("Unable to connect to Thought Space. Make sure the web service is running.");
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "无法连接 Thought Space，请检查网络或稍后重试。");
       }
       return false;
     }
@@ -246,10 +253,10 @@
         stream = media;
         if (!await ensureDesktopSession()) { media.getTracks().forEach(track => track.stop()); stream = null; return; }
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
-        const response = await fetch(`${apiOrigin}/api/speech/session?language=cn`, { headers: desktopHeaders() });
-        const session = await response.json();
+        const response = await desktopApi("/api/speech/session?language=cn");
+        const session = response.data;
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
-        if (!session.data || !session.data.url) throw new Error("实时转写不可用");
+        if (!response.ok || !session?.data?.url) throw new Error(session?.error?.message || "实时转写不可用");
         const audioContext = new AudioContext();
         context = audioContext;
         const webSocket = new WebSocket(session.data.url);
@@ -312,8 +319,8 @@
       if (!value) { setNotice("请先说一句或输入内容。"); return; }
       try {
         if (!await ensureDesktopSession()) return;
-        const response = await fetch(`${apiOrigin}/api/thoughts`, {method:"POST",headers:{"Content-Type":"application/json",...desktopHeaders()},body:JSON.stringify({transcript:value,language:"cn",source:"desktop_orb"})});
-        const result = await response.json().catch(() => null);
+        const response = await desktopApi("/api/thoughts", {method:"POST",body:JSON.stringify({transcript:value,language:"cn",source:"desktop_orb"})});
+        const result = response.data;
         if (!response.ok) throw new Error(result?.error?.message || "Save failed. Please try again.");
         stop(); resetTranscript(); setNotice("已保存到 Thought Space"); setTimeout(collapse,800);
       } catch (error) { setNotice(error instanceof Error ? error.message : "保存失败，请稍后重试。"); }

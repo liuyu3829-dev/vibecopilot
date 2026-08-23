@@ -9,6 +9,8 @@ use std::{
 };
 
 use keyring::Entry;
+use reqwest::Method;
+use serde::Serialize;
 use tauri::{AppHandle, LogicalSize, Manager, Size, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 use url::Url;
@@ -26,7 +28,13 @@ struct PendingTicket(Mutex<Option<String>>);
 
 enum OrbAction {
   Show(Option<String>, Option<String>),
-  Hide,
+  Hide(Option<String>),
+}
+
+#[derive(Serialize)]
+struct DesktopApiResponse {
+  status: u16,
+  body: String,
 }
 
 fn position_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -51,7 +59,9 @@ fn orb_action_from_url(url: &Url) -> Option<OrbAction> {
       url.query_pairs().find(|(name, _)| name == "ticket").map(|(_, value)| value.into_owned()),
       url.query_pairs().find(|(name, _)| name == "control").map(|(_, value)| value.into_owned()),
     )),
-    Some("hide-orb") => Some(OrbAction::Hide),
+    Some("hide-orb") => Some(OrbAction::Hide(
+      url.query_pairs().find(|(name, _)| name == "control").map(|(_, value)| value.into_owned()),
+    )),
     _ => None,
   }
 }
@@ -98,7 +108,12 @@ fn hide_orb(app: &AppHandle) -> Result<(), String> {
 fn handle_orb_url(app: &AppHandle, url: &Url) -> Result<(), String> {
   match orb_action_from_url(url) {
     Some(OrbAction::Show(ticket, control_secret)) => open_orb(app, ticket, control_secret),
-    Some(OrbAction::Hide) => hide_orb(app),
+    Some(OrbAction::Hide(control_secret)) => {
+      if let Some(control_secret) = control_secret {
+        store_control_secret(&control_secret)?;
+      }
+      hide_orb(app)
+    }
     None => Ok(()),
   }
 }
@@ -143,8 +158,46 @@ fn api_origin_value() -> String {
   option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or("http://127.0.0.1:3001").trim_end_matches('/').to_string()
 }
 
+fn desktop_api_url(path: &str) -> Result<String, String> {
+  if !path.starts_with("/api/") {
+    return Err("Desktop requests must target Thought Space APIs.".to_string());
+  }
+  Ok(format!("{}{}", api_origin_value(), path))
+}
+
+#[tauri::command]
+async fn desktop_api_request(
+  path: String,
+  method: String,
+  body: Option<String>,
+  authorization: Option<String>,
+) -> Result<DesktopApiResponse, String> {
+  let method = match method.as_str() {
+    "GET" => Method::GET,
+    "POST" => Method::POST,
+    _ => return Err("Unsupported desktop request method.".to_string()),
+  };
+  // Use the operating system's proxy configuration when one is present, just
+  // like the browser that the user used to open Thought Space.
+  let client = reqwest::Client::builder().build()
+    .map_err(|error| format!("Unable to prepare Thought Space connection: {error}"))?;
+  let mut request = client.request(method, desktop_api_url(&path)?)
+    .header("Accept", "application/json");
+  if let Some(authorization) = authorization {
+    request = request.header("Authorization", authorization);
+  }
+  if let Some(body) = body {
+    request = request.header("Content-Type", "application/json").body(body);
+  }
+  let response = request.send().await.map_err(|error| format!("Unable to reach Thought Space: {error}"))?;
+  let status = response.status().as_u16();
+  let body = response.text().await.map_err(|error| format!("Unable to read Thought Space response: {error}"))?;
+  Ok(DesktopApiResponse { status, body })
+}
+
 fn allowed_control_origin(origin: &str) -> bool {
-  origin == api_origin_value() || (cfg!(debug_assertions) && origin == "http://localhost:3001")
+  origin == api_origin_value()
+    || (cfg!(debug_assertions) && origin == "http://localhost:3001")
 }
 
 fn secrets_match(expected: &str, received: &str) -> bool {
@@ -182,10 +235,29 @@ fn handle_control_connection(mut stream: TcpStream, app: &AppHandle) {
   write_control_response(&mut stream, if result.is_ok() { "204 No Content" } else { "500 Internal Server Error" }, Some(origin));
 }
 
+fn control_listener_retry_delay(error: ErrorKind) -> Option<Duration> {
+  match error {
+    ErrorKind::AddrInUse | ErrorKind::Interrupted => Some(Duration::from_secs(1)),
+    _ => None,
+  }
+}
+
 fn start_control_listener(app: AppHandle) {
-  thread::spawn(move || {
-    let listener = match TcpListener::bind(("127.0.0.1", CONTROL_PORT)) { Ok(listener) => listener, Err(_) => return };
-    let _ = listener.set_nonblocking(true);
+  thread::spawn(move || loop {
+    let listener = match TcpListener::bind(("127.0.0.1", CONTROL_PORT)) {
+      Ok(listener) => listener,
+      Err(error) => match control_listener_retry_delay(error.kind()) {
+        Some(delay) => {
+          thread::sleep(delay);
+          continue;
+        }
+        None => return,
+      },
+    };
+    if listener.set_nonblocking(true).is_err() {
+      thread::sleep(Duration::from_secs(1));
+      continue;
+    }
     loop {
       match listener.accept() {
         Ok((stream, _)) => handle_control_connection(stream, &app),
@@ -193,6 +265,7 @@ fn start_control_listener(app: AppHandle) {
         Err(_) => break,
       }
     }
+    thread::sleep(Duration::from_secs(1));
   });
 }
 
@@ -226,7 +299,8 @@ fn clear_token() -> Result<(), String> {
 
 #[cfg(test)]
 mod control_bridge_tests {
-  use super::{allowed_control_origin, api_origin_value, secrets_match};
+  use super::{allowed_control_origin, api_origin_value, control_listener_retry_delay, secrets_match};
+  use std::{io::ErrorKind, time::Duration};
 
   #[test]
   fn only_the_packaged_web_origin_is_allowed_to_control_the_orb() {
@@ -235,10 +309,20 @@ mod control_bridge_tests {
   }
 
   #[test]
+  fn rejects_temporary_vercel_deployment_urls() {
+    assert!(!allowed_control_origin("https://vibecopilot-pp4tns6c6-liuyu3829-devs-projects.vercel.app"));
+  }
+
+  #[test]
   fn control_secret_requires_an_exact_match() {
     assert!(secrets_match("desktop-control-secret", "desktop-control-secret"));
     assert!(!secrets_match("desktop-control-secret", "desktop-control-secrex"));
     assert!(!secrets_match("desktop-control-secret", "desktop-control"));
+  }
+
+  #[test]
+  fn temporarily_busy_control_ports_are_retried() {
+    assert_eq!(control_listener_retry_delay(ErrorKind::AddrInUse), Some(Duration::from_secs(1)));
   }
 }
 
@@ -264,8 +348,12 @@ pub fn run() {
       let _ = app.deep_link().register_all();
 
       let handle = app.handle().clone();
+      let mut launched_for_hide_only = false;
       if let Some(urls) = app.deep_link().get_current()? {
         for url in urls {
+          if matches!(orb_action_from_url(&url), Some(OrbAction::Hide(_))) {
+            launched_for_hide_only = true;
+          }
           let _ = handle_orb_url(&handle, &url);
         }
       }
@@ -278,10 +366,12 @@ pub fn run() {
       });
 
       start_control_listener(handle.clone());
-      open_orb(&handle, None, None)?;
+      if !launched_for_hide_only {
+        open_orb(&handle, None, None)?;
+      }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin])
+  .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin, desktop_api_request])
     .run(tauri::generate_context!())
     .expect("error while running Thought Space Orb");
 }

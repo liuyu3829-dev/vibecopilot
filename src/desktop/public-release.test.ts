@@ -30,11 +30,19 @@ describe("public desktop-orb release flow", () => {
   it("gives the bundled orb a remote API origin and a one-time pairing ticket", () => {
     const shell = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
-    expect(shell).toContain('invoke("api_origin")');
+    expect(shell).toContain('invoke("desktop_api_request"');
     expect(shell).toContain('invoke("take_launch_ticket")');
-    expect(shell).toContain('Authorization: desktopToken');
+    expect(shell).toContain("authorization: desktopToken");
     expect(native).toContain("fn take_launch_ticket");
-    expect(native).toContain("fn api_origin");
+    expect(native).toContain("async fn desktop_api_request");
+    expect(native).toContain("fn desktop_api_url");
     expect(native).toContain("start_control_listener");
+  });
+
+  it("packs the public installer against the canonical production API instead of localhost", () => {
+    const packageJson = readFileSync(resolve(process.cwd(), "package.json"), "utf8");
+
+    expect(packageJson).toContain('"desktop:pack": "set \\\"THOUGHT_SPACE_API_ORIGIN=https://vibecopilot-xi.vercel.app\\\" && tauri build"');
+    expect(packageJson).not.toContain("liuyu3829-devs-projects.vercel.app");
   });
 });

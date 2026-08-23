@@ -11,4 +11,11 @@ describe("desktop orb controls", () => {
     expect(page).toContain('controlDesktopPet("hide")');
     expect(page).not.toContain('desktopControlUrl("hide")');
   });
+
+  it("never launches the desktop protocol when Hide cannot reach an already-running orb", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+
+    expect(page).toContain('if (action === "hide")');
+    expect(page).not.toContain("desktopHideUrl(controlSecret)");
+  });
 });
