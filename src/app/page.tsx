@@ -254,12 +254,14 @@ export default function Home() {
         stopRecording();
         reportCaptureIssue("streaming");
       };
-      const startAudio = () => {
+      const startAudio = async () => {
         if (started || captureRun.current !== run) return;
         started = true;
-        graph.current = connectAudioGraph(context, mediaStream, (samples, sampleRate) => {
+        const audioGraph = await connectAudioGraph(context, mediaStream, (samples, sampleRate) => {
           if (webSocket.readyState === WebSocket.OPEN) webSocket.send(encodePcm16(samples, sampleRate));
         });
+        if (captureRun.current !== run) { disconnectAudioGraph(audioGraph); return; }
+        graph.current = audioGraph;
         setVoiceCaptured(true);
         setRecording(true);
       };
@@ -268,7 +270,7 @@ export default function Home() {
         if (!shouldAcceptCaptureMessage(captureRun.current, run)) return;
         const messageType = parseAssemblyMessageType(event.data);
         if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
-        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); void startAudio().catch(failStreaming); return; }
         const expectedLanguage = locale === "zh-CN" ? "cn" : "en";
         transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), expectedLanguage);
         setDraft(`${transcript.current.confirmed}${transcript.current.live}`);

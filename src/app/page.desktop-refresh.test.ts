@@ -22,11 +22,11 @@ describe("desktop orb timeline refresh", () => {
     expect(styles).toContain('white-space: nowrap');
   });
 
-  it("resumes Web Audio before connecting the web capture stream", () => {
+  it("resumes Web Audio before connecting the web AudioWorklet stream", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
 
     expect(page).toContain("await resumeAudioContext(context)");
-    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("connectAudioGraph(context, mediaStream"));
+    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("await connectAudioGraph(context, mediaStream"));
     expect(page.indexOf("const context = new AudioContext();")).toBeLessThan(page.indexOf('await fetch(`/api/speech/session'));
   });
 
@@ -44,8 +44,9 @@ describe("desktop orb timeline refresh", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
 
     expect(page).toContain('messageType === "Begin"');
-    expect(page).toContain('startAudio(); return;');
+    expect(page).toContain("void startAudio().catch(failStreaming); return;");
     expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
     expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+    expect(page).toContain("void startAudio().catch(failStreaming)");
   });
 });

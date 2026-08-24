@@ -121,11 +121,11 @@ describe("bundled desktop orb shell", () => {
     expect(page).toContain("if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }");
   });
 
-  it("resumes Web Audio before sending microphone samples", () => {
+  it("resumes Web Audio before starting the native AudioWorklet", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
 
     expect(page).toContain("await audioContext.resume();");
-    expect(page.indexOf("await audioContext.resume();")).toBeLessThan(page.indexOf("source = audioContext.createMediaStreamSource(media)"));
+    expect(page.indexOf("await audioContext.resume();")).toBeLessThan(page.indexOf('await audioContext.audioWorklet.addModule("./audio-capture-worklet.js")'));
     expect(page.indexOf("const audioContext = new AudioContext();")).toBeLessThan(page.indexOf("await navigator.mediaDevices.getUserMedia"));
   });
 
@@ -143,9 +143,10 @@ describe("bundled desktop orb shell", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
 
     expect(page).toContain('messageType === "Begin"');
-    expect(page).toContain('startAudio(); return;');
+    expect(page).toContain("void startAudio().catch(failStreaming); return;");
     expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
     expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+    expect(page).toContain('new AudioWorkletNode(audioContext, "pcm-capture")');
   });
 
   it("requires a valid paired desktop session before recording or saving", () => {

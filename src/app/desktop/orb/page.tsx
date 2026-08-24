@@ -107,12 +107,14 @@ export default function DesktopOrbPage() {
         stop();
         reportCaptureIssue("streaming");
       };
-      const startAudio = () => {
+      const startAudio = async () => {
         if (started || run.current !== activeRun) return;
         started = true;
-        graph.current = connectAudioGraph(context, media, (samples, sampleRate) => {
+        const audioGraph = await connectAudioGraph(context, media, (samples, sampleRate) => {
           if (webSocket.readyState === WebSocket.OPEN) webSocket.send(encodePcm16(samples, sampleRate));
         });
+        if (run.current !== activeRun) { disconnectAudioGraph(audioGraph); return; }
+        graph.current = audioGraph;
         setNotice("");
         setRecording(true);
       };
@@ -121,7 +123,7 @@ export default function DesktopOrbPage() {
         if (!shouldAcceptCaptureMessage(run.current, activeRun)) return;
         const messageType = parseAssemblyMessageType(event.data);
         if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
-        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); void startAudio().catch(failStreaming); return; }
         transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), "cn");
         setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
       };

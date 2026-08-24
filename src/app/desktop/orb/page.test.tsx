@@ -41,11 +41,11 @@ describe("DesktopOrbPage", () => {
     expect(await screen.findByRole("button", { name: /开始说话/ })).toBeInTheDocument();
   });
 
-  it("resumes Web Audio before connecting the legacy desktop capture stream", () => {
+  it("resumes Web Audio before connecting the legacy desktop AudioWorklet stream", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/desktop/orb/page.tsx"), "utf8");
 
     expect(page).toContain("await resumeAudioContext(context)");
-    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("connectAudioGraph(context, media,"));
+    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("await connectAudioGraph(context, media,"));
     expect(page.indexOf("const context = new AudioContext();")).toBeLessThan(page.indexOf("await navigator.mediaDevices.getUserMedia"));
   });
 
@@ -62,8 +62,9 @@ describe("DesktopOrbPage", () => {
     const page = readFileSync(resolve(process.cwd(), "src/app/desktop/orb/page.tsx"), "utf8");
 
     expect(page).toContain('messageType === "Begin"');
-    expect(page).toContain('startAudio(); return;');
+    expect(page).toContain("void startAudio().catch(failStreaming); return;");
     expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
     expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+    expect(page).toContain("void startAudio().catch(failStreaming)");
   });
 });

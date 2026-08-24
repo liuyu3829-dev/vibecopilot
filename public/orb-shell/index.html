@@ -221,7 +221,7 @@
     }
     function stop() {
       captureRun += 1;
-      if (processor) { processor.onaudioprocess = null; processor.disconnect(); processor = null; }
+      if (processor) { processor.port.onmessage = null; processor.disconnect(); processor = null; }
       if (source) { source.disconnect(); source = null; }
       if (socket) { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type:"Terminate"})); socket.close(); socket = null; }
       if (stream) { stream.getTracks().forEach(track => track.stop()); stream = null; }
@@ -284,13 +284,14 @@
           stop();
           reportCaptureIssue("streaming");
         };
-        const startAudio = () => {
+        const startAudio = async () => {
           if (started || captureRun !== activeRun) return;
           started = true;
+          await audioContext.audioWorklet.addModule("./audio-capture-worklet.js");
           source = audioContext.createMediaStreamSource(media);
-          processor = audioContext.createScriptProcessor(4096,1,1);
-          processor.onaudioprocess = event => {
-            const samples = event.inputBuffer.getChannelData(0);
+          processor = new AudioWorkletNode(audioContext, "pcm-capture");
+          processor.port.onmessage = event => {
+            const samples = new Float32Array(event.data);
             drawWave(samples);
             if (socket === webSocket && webSocket.readyState === WebSocket.OPEN) webSocket.send(pcm16(samples, audioContext.sampleRate));
           };
@@ -304,7 +305,7 @@
           let messageType;
           try { messageType = JSON.parse(event.data).type; } catch {}
           if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
-          if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+          if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); void startAudio().catch(failStreaming); return; }
           addTurn(event, activeRun);
         };
         webSocket.onerror = failStreaming;
