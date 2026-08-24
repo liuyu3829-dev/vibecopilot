@@ -153,6 +153,10 @@
     }
 
     function setNotice(value) { notice.textContent = value || ""; }
+    function reportCaptureIssue(stage) {
+      console.warn("[thought-space][desktop-capture]", {stage});
+      setNotice(`无法启动实时转写。(${stage})`);
+    }
     function renderCaptureControls() {
       recordButton.disabled = false;
       if (recording) {
@@ -252,22 +256,29 @@
       saveButton.hidden = true;
       recordButton.textContent = "正在连接…";
       setNotice("正在请求麦克风…");
+      let stage = "audio_context";
       try {
+        const audioContext = new AudioContext();
+        context = audioContext;
+        await audioContext.resume();
+        if (audioContext.state !== "running") throw new Error("Audio context could not start.");
+        stage = "microphone";
         const media = await navigator.mediaDevices.getUserMedia({audio:true});
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         stream = media;
         if (!await ensureDesktopSession()) { media.getTracks().forEach(track => track.stop()); stream = null; return; }
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
+        stage = "speech_session";
         const response = await desktopApi("/api/speech/session?language=cn");
         const session = response.data;
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         if (!response.ok || !session?.data?.url) throw new Error(session?.error?.message || "实时转写不可用");
-        const audioContext = new AudioContext();
-        context = audioContext;
+        stage = "streaming";
         const webSocket = new WebSocket(session.data.url);
         socket = webSocket;
         webSocket.onmessage = event => addTurn(event, activeRun);
-        webSocket.onerror = () => setNotice("实时转写连接失败，请重试。");
+        webSocket.onerror = () => { if (socket === webSocket) reportCaptureIssue("streaming"); };
+        webSocket.onclose = () => { if (socket === webSocket) reportCaptureIssue("streaming"); };
         webSocket.onopen = () => {
           if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }
           source = audioContext.createMediaStreamSource(media);
@@ -282,7 +293,7 @@
           renderCaptureControls();
         };
       } catch {
-        stop(); setNotice("无法访问麦克风或启动实时转写，请检查麦克风权限。");
+        stop(); reportCaptureIssue(stage);
       }
     }
     async function open() {

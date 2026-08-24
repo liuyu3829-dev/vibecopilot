@@ -1,4 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DesktopOrbPage from "./page";
@@ -37,5 +39,22 @@ describe("DesktopOrbPage", () => {
     expect(screen.queryByRole("button", { name: /开始说话/ })).not.toBeInTheDocument();
     expand?.();
     expect(await screen.findByRole("button", { name: /开始说话/ })).toBeInTheDocument();
+  });
+
+  it("resumes Web Audio before connecting the legacy desktop capture stream", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/desktop/orb/page.tsx"), "utf8");
+
+    expect(page).toContain("await resumeAudioContext(context)");
+    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("connectAudioGraph(context, media,"));
+    expect(page.indexOf("const context = new AudioContext();")).toBeLessThan(page.indexOf("await navigator.mediaDevices.getUserMedia"));
+  });
+
+  it("reports safe capture stages", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/desktop/orb/page.tsx"), "utf8");
+
+    expect(page).toContain('"speech_session"');
+    expect(page).toContain('"microphone"');
+    expect(page).toContain('"audio_context"');
+    expect(page).toContain('"streaming"');
   });
 });

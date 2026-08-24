@@ -3,12 +3,13 @@
 import { Microphone, Stop, X } from "@phosphor-icons/react";
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import "./orb.css";
-import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, type AudioGraph } from "@/lib/audio-session";
+import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, resumeAudioContext, type AudioGraph } from "@/lib/audio-session";
 import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { desktopShell } from "@/lib/desktop-shell";
 
 type PointerState = { x: number; y: number; moved: boolean; timer: number | null };
+type CaptureStage = "speech_session" | "microphone" | "audio_context" | "streaming";
 
 export default function DesktopOrbPage() {
   const [expanded, setExpanded] = useState(false);
@@ -46,6 +47,11 @@ export default function DesktopOrbPage() {
     setRecording(false);
   };
 
+  const reportCaptureIssue = (stage: CaptureStage) => {
+    console.warn("[thought-space][legacy-desktop-capture]", { stage });
+    setNotice(`无法启动实时转写。(${stage})`);
+  };
+
   useEffect(() => {
     const ticket = new URLSearchParams(window.location.search).get("ticket");
     desktopShell().token().then(async (stored) => {
@@ -76,24 +82,30 @@ export default function DesktopOrbPage() {
     transcript.current = { confirmed: initialDraft, live: "" };
     setDraft(initialDraft);
     setNotice("正在请求麦克风…");
+    let stage: CaptureStage = "audio_context";
     try {
+      const context = new AudioContext();
+      audio.current = context;
+      await resumeAudioContext(context);
+      stage = "microphone";
       const media = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (run.current !== activeRun) { media.getTracks().forEach((track) => track.stop()); return; }
       stream.current = media;
       setNotice("正在连接实时转写…");
+      stage = "speech_session";
       const response = await apiFetch("/api/speech/session?language=cn");
       const session = await response.json();
       if (!session.data?.url) throw new Error("Speech unavailable");
-      const context = new AudioContext();
+      stage = "streaming";
       const webSocket = new WebSocket(session.data.url);
-      audio.current = context;
       socket.current = webSocket;
       webSocket.onmessage = (event) => {
         if (!shouldAcceptCaptureMessage(run.current, activeRun)) return;
         transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), "cn");
         setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
       };
-      webSocket.onerror = () => setNotice("实时转写连接失败，请重新录音。");
+      webSocket.onerror = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
+      webSocket.onclose = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
       webSocket.onopen = () => {
         if (run.current !== activeRun) { webSocket.close(); media.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
         graph.current = connectAudioGraph(context, media, (samples, sampleRate) => {
@@ -104,7 +116,7 @@ export default function DesktopOrbPage() {
       };
     } catch {
       stop();
-      setNotice("无法访问麦克风或启动实时转写，请检查系统麦克风权限。");
+      reportCaptureIssue(stage);
     }
   };
 

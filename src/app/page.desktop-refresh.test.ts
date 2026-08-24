@@ -21,4 +21,22 @@ describe("desktop orb timeline refresh", () => {
     expect(page).toContain('className="capture-start"');
     expect(styles).toContain('white-space: nowrap');
   });
+
+  it("resumes Web Audio before connecting the web capture stream", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+
+    expect(page).toContain("await resumeAudioContext(context)");
+    expect(page.indexOf("await resumeAudioContext(context)")).toBeLessThan(page.indexOf("connectAudioGraph(context, mediaStream"));
+    expect(page.indexOf("const context = new AudioContext();")).toBeLessThan(page.indexOf('await fetch(`/api/speech/session'));
+  });
+
+  it("reports safe capture stages without logging capture content", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+
+    expect(page).toContain('"speech_session"');
+    expect(page).toContain('"microphone"');
+    expect(page).toContain('"audio_context"');
+    expect(page).toContain('"streaming"');
+    expect(page).toContain('console.warn("[thought-space][capture]"');
+  });
 });

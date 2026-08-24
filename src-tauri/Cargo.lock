@@ -3887,7 +3887,7 @@ dependencies = [
 
 [[package]]
 name = "thought-space-orb"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "keyring",
  "reqwest 0.12.28",

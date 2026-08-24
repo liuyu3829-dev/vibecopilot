@@ -17,7 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, type AudioGraph } from "@/lib/audio-session";
+import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, resumeAudioContext, type AudioGraph } from "@/lib/audio-session";
 import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { localDateKey } from "@/lib/thought-timeline";
@@ -54,6 +54,7 @@ type Report = {
   evidence: Array<{ thoughtId: string; capturedAt: string; transcript: string }>;
 };
 type Section = "thoughts" | "reports" | "voice" | "tags" | "search" | "settings";
+type CaptureStage = "speech_session" | "microphone" | "audio_context" | "streaming";
 const text = {
   en: {
     home: "Home", thoughts: "Thoughts", reports: "Reports", voice: "Voice notes", tags: "Tags", search: "Search", settings: "Settings",
@@ -217,6 +218,11 @@ export default function Home() {
     setRecording(false);
   };
 
+  const reportCaptureIssue = (stage: CaptureStage) => {
+    console.warn("[thought-space][capture]", { stage });
+    setNotice(`${t.captureError} (${stage})`);
+  };
+
   const startRecording = async (initialDraft = "") => {
     stopRecording();
     setDiscardArmed(false);
@@ -224,16 +230,21 @@ export default function Home() {
     setNotice("");
     transcript.current = { confirmed: initialDraft, live: "" };
     setDraft(initialDraft);
+    let stage: CaptureStage = "audio_context";
     try {
+      const context = new AudioContext();
+      audio.current = context;
+      await resumeAudioContext(context);
+      stage = "speech_session";
       const response = await fetch(`/api/speech/session?language=${locale === "zh-CN" ? "cn" : "en"}`);
       const session = await response.json();
       if (!session.data?.url) throw new Error(session.error?.message ?? "Speech unavailable");
+      stage = "microphone";
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (captureRun.current !== run) { mediaStream.getTracks().forEach((track) => track.stop()); return; }
-      const context = new AudioContext();
+      stage = "streaming";
       const webSocket = new WebSocket(session.data.url);
       stream.current = mediaStream;
-      audio.current = context;
       socket.current = webSocket;
       webSocket.onmessage = (event) => {
         if (!shouldAcceptCaptureMessage(captureRun.current, run)) return;
@@ -241,7 +252,8 @@ export default function Home() {
         transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), expectedLanguage);
         setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
       };
-      webSocket.onerror = () => setNotice(t.captureError);
+      webSocket.onerror = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
+      webSocket.onclose = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
       webSocket.onopen = () => {
         if (captureRun.current !== run) { webSocket.close(); mediaStream.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
         graph.current = connectAudioGraph(context, mediaStream, (samples, sampleRate) => {
@@ -252,7 +264,7 @@ export default function Home() {
       };
     } catch {
       stopRecording();
-      setNotice(t.captureError);
+      reportCaptureIssue(stage);
     }
   };
 

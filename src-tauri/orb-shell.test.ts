@@ -121,6 +121,24 @@ describe("bundled desktop orb shell", () => {
     expect(page).toContain("if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }");
   });
 
+  it("resumes Web Audio before sending microphone samples", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain("await audioContext.resume();");
+    expect(page.indexOf("await audioContext.resume();")).toBeLessThan(page.indexOf("source = audioContext.createMediaStreamSource(media)"));
+    expect(page.indexOf("const audioContext = new AudioContext();")).toBeLessThan(page.indexOf("await navigator.mediaDevices.getUserMedia"));
+  });
+
+  it("reports safe capture stages without logging transcript content", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain('"speech_session"');
+    expect(page).toContain('"microphone"');
+    expect(page).toContain('"audio_context"');
+    expect(page).toContain('"streaming"');
+    expect(page).toContain('console.warn("[thought-space][desktop-capture]"');
+  });
+
   it("requires a valid paired desktop session before recording or saving", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
