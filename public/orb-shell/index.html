@@ -146,8 +146,9 @@
           return false;
         }
         setNotice(result?.error?.message || "Unable to connect to Thought Space. Please try again.");
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : "无法连接 Thought Space，请检查网络或稍后重试。");
+       } catch (error) {
+         console.warn("[thought-space][desktop-capture]", { stage: "desktop_api" });
+         setNotice(error instanceof Error ? error.message : "无法连接 Thought Space，请检查网络或稍后重试。");
       }
       return false;
     }
@@ -266,7 +267,7 @@
         const media = await navigator.mediaDevices.getUserMedia({audio:true});
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         stream = media;
-        if (!await ensureDesktopSession()) { media.getTracks().forEach(track => track.stop()); stream = null; return; }
+        if (!await ensureDesktopSession()) { stop(); return; }
         if (captureRun !== activeRun) { media.getTracks().forEach(track => track.stop()); return; }
         stage = "speech_session";
         const response = await desktopApi("/api/speech/session?language=cn");

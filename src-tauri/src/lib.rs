@@ -158,8 +158,12 @@ fn stored_control_secret() -> Option<String> {
   control_keyring_entry().ok()?.get_password().ok()
 }
 
+fn default_api_origin(debug: bool) -> &'static str {
+  if debug { "http://127.0.0.1:3001" } else { "https://vibecopilot-xi.vercel.app" }
+}
+
 fn api_origin_value() -> String {
-  option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or("http://127.0.0.1:3001").trim_end_matches('/').to_string()
+  option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or(default_api_origin(cfg!(debug_assertions))).trim_end_matches('/').to_string()
 }
 
 fn desktop_api_url(path: &str) -> Result<String, String> {
@@ -303,7 +307,7 @@ fn clear_token() -> Result<(), String> {
 
 #[cfg(test)]
 mod control_bridge_tests {
-  use super::{allowed_control_origin, api_origin_value, control_listener_retry_delay, secrets_match};
+  use super::{allowed_control_origin, api_origin_value, control_listener_retry_delay, default_api_origin, secrets_match};
   use std::{io::ErrorKind, time::Duration};
 
   #[test]
@@ -327,6 +331,12 @@ mod control_bridge_tests {
   #[test]
   fn temporarily_busy_control_ports_are_retried() {
     assert_eq!(control_listener_retry_delay(ErrorKind::AddrInUse), Some(Duration::from_secs(1)));
+  }
+
+  #[test]
+  fn release_default_api_origin_is_the_stable_production_site() {
+    assert_eq!(default_api_origin(false), "https://vibecopilot-xi.vercel.app");
+    assert_eq!(default_api_origin(true), "http://127.0.0.1:3001");
   }
 }
 

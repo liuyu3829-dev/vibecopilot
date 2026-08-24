@@ -177,6 +177,13 @@ describe("bundled desktop orb shell", () => {
     expect(page).not.toContain("Make sure the web service is running.");
   });
 
+  it("returns the native orb to an idle state when its desktop API check fails", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain('if (!await ensureDesktopSession()) { stop(); return; }');
+    expect(page).toContain('stage: "desktop_api"');
+  });
+
   it("uses the Windows system proxy configuration and surfaces native connection errors", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
@@ -185,5 +192,12 @@ describe("bundled desktop orb shell", () => {
     expect(native).not.toContain("reqwest::Client::builder().no_proxy().build()");
     expect(page).toContain("catch (error)");
     expect(page).toContain("error instanceof Error ? error.message");
+  });
+
+  it("keeps release installers on the stable production origin when no build origin is supplied", () => {
+    const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+
+    expect(native).toContain('"https://vibecopilot-xi.vercel.app"');
+    expect(native).toContain("default_api_origin(cfg!(debug_assertions))");
   });
 });

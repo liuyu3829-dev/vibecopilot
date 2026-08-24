@@ -43,8 +43,8 @@ describe("public desktop-orb release flow", () => {
     const packageJson = readFileSync(resolve(process.cwd(), "package.json"), "utf8");
     const tauriConfig = readFileSync(resolve(process.cwd(), "src-tauri/tauri.conf.json"), "utf8");
 
-    expect(packageJson).toContain('"version": "0.1.6"');
-    expect(tauriConfig).toContain('"version": "0.1.6"');
+    expect(packageJson).toContain('"version": "0.1.7"');
+    expect(tauriConfig).toContain('"version": "0.1.7"');
     expect(packageJson).toContain('"desktop:pack": "set \\\"THOUGHT_SPACE_API_ORIGIN=https://vibecopilot-xi.vercel.app\\\" && tauri build"');
     expect(packageJson).not.toContain("liuyu3829-devs-projects.vercel.app");
   });
