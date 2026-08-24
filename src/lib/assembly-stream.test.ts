@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { encodePcm16, isExpectedAssemblyTurn, mergeAssemblyTranscript, parseAssemblyTurn } from "./assembly-stream";
+import { encodePcm16, isExpectedAssemblyTurn, mergeAssemblyTranscript, parseAssemblyMessageType, parseAssemblyTurn } from "./assembly-stream";
 
 describe("AssemblyAI streaming messages", () => {
+  it("recognizes handshake and server error message types without exposing their contents", () => {
+    expect(parseAssemblyMessageType(JSON.stringify({ type: "Begin" }))).toBe("Begin");
+    expect(parseAssemblyMessageType(JSON.stringify({ type: "Error", error: "private details" }))).toBe("Error");
+    expect(parseAssemblyMessageType("not json")).toBeUndefined();
+  });
+
   it("distinguishes partial and final Turn transcripts", () => {
     expect(parseAssemblyTurn(JSON.stringify({ type: "Turn", transcript: "hello", end_of_turn: false }))).toEqual({ type: "partial", text: "hello", languageCode: undefined });
     expect(parseAssemblyTurn(JSON.stringify({ type: "Turn", transcript: "hello world", end_of_turn: true, language_code: "en" }))).toEqual({ type: "final", text: "hello world", languageCode: "en" });

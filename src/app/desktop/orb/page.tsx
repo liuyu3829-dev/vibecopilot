@@ -4,7 +4,7 @@ import { Microphone, Stop, X } from "@phosphor-icons/react";
 import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
 import "./orb.css";
 import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, resumeAudioContext, type AudioGraph } from "@/lib/audio-session";
-import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
+import { encodePcm16, mergeAssemblyTranscript, parseAssemblyMessageType, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { desktopShell } from "@/lib/desktop-shell";
 
@@ -99,20 +99,36 @@ export default function DesktopOrbPage() {
       stage = "streaming";
       const webSocket = new WebSocket(session.data.url);
       socket.current = webSocket;
-      webSocket.onmessage = (event) => {
-        if (!shouldAcceptCaptureMessage(run.current, activeRun)) return;
-        transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), "cn");
-        setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
+      let started = false;
+      let failed = false;
+      const failStreaming = () => {
+        if (failed || socket.current !== webSocket) return;
+        failed = true;
+        stop();
+        reportCaptureIssue("streaming");
       };
-      webSocket.onerror = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
-      webSocket.onclose = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
-      webSocket.onopen = () => {
-        if (run.current !== activeRun) { webSocket.close(); media.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
+      const startAudio = () => {
+        if (started || run.current !== activeRun) return;
+        started = true;
         graph.current = connectAudioGraph(context, media, (samples, sampleRate) => {
           if (webSocket.readyState === WebSocket.OPEN) webSocket.send(encodePcm16(samples, sampleRate));
         });
         setNotice("");
         setRecording(true);
+      };
+      const handshakeTimeout = window.setTimeout(failStreaming, 5000);
+      webSocket.onmessage = (event) => {
+        if (!shouldAcceptCaptureMessage(run.current, activeRun)) return;
+        const messageType = parseAssemblyMessageType(event.data);
+        if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
+        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+        transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), "cn");
+        setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
+      };
+      webSocket.onerror = failStreaming;
+      webSocket.onclose = failStreaming;
+      webSocket.onopen = () => {
+        if (run.current !== activeRun) { webSocket.close(); media.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
       };
     } catch {
       stop();

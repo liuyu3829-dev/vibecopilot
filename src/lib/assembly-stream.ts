@@ -3,6 +3,15 @@ export type TranscriptState = { confirmed: string; live: string };
 
 type CaptureLanguage = "cn" | "en";
 
+export function parseAssemblyMessageType(raw: string) {
+  try {
+    const payload = JSON.parse(raw) as { type?: unknown };
+    return typeof payload.type === "string" ? payload.type : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseAssemblyTurn(raw: string): AssemblyTurn {
   try {
     const payload = JSON.parse(raw) as { type?: string; transcript?: string; end_of_turn?: boolean; language_code?: string };

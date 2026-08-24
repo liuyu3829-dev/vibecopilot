@@ -57,4 +57,13 @@ describe("DesktopOrbPage", () => {
     expect(page).toContain('"audio_context"');
     expect(page).toContain('"streaming"');
   });
+
+  it("waits for the AssemblyAI Begin handshake before sending legacy desktop audio", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/desktop/orb/page.tsx"), "utf8");
+
+    expect(page).toContain('messageType === "Begin"');
+    expect(page).toContain('startAudio(); return;');
+    expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
+    expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+  });
 });

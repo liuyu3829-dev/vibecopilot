@@ -39,4 +39,13 @@ describe("desktop orb timeline refresh", () => {
     expect(page).toContain('"streaming"');
     expect(page).toContain('console.warn("[thought-space][capture]"');
   });
+
+  it("waits for the AssemblyAI Begin handshake before sending web microphone audio", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+
+    expect(page).toContain('messageType === "Begin"');
+    expect(page).toContain('startAudio(); return;');
+    expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
+    expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+  });
 });

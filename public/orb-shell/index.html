@@ -276,11 +276,17 @@
         stage = "streaming";
         const webSocket = new WebSocket(session.data.url);
         socket = webSocket;
-        webSocket.onmessage = event => addTurn(event, activeRun);
-        webSocket.onerror = () => { if (socket === webSocket) reportCaptureIssue("streaming"); };
-        webSocket.onclose = () => { if (socket === webSocket) reportCaptureIssue("streaming"); };
-        webSocket.onopen = () => {
-          if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }
+        let started = false;
+        let failed = false;
+        const failStreaming = () => {
+          if (failed || socket !== webSocket) return;
+          failed = true;
+          stop();
+          reportCaptureIssue("streaming");
+        };
+        const startAudio = () => {
+          if (started || captureRun !== activeRun) return;
+          started = true;
           source = audioContext.createMediaStreamSource(media);
           processor = audioContext.createScriptProcessor(4096,1,1);
           processor.onaudioprocess = event => {
@@ -291,6 +297,20 @@
           source.connect(processor); processor.connect(context.destination);
           recording = true; setNotice(""); hint.textContent = "你的话会实时显示在下方。";
           renderCaptureControls();
+        };
+        const handshakeTimeout = window.setTimeout(failStreaming, 5000);
+        webSocket.onmessage = event => {
+          if (captureRun !== activeRun) return;
+          let messageType;
+          try { messageType = JSON.parse(event.data).type; } catch {}
+          if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
+          if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+          addTurn(event, activeRun);
+        };
+        webSocket.onerror = failStreaming;
+        webSocket.onclose = failStreaming;
+        webSocket.onopen = () => {
+          if (captureRun !== activeRun) { webSocket.close(); media.getTracks().forEach(track => track.stop()); void audioContext.close(); return; }
         };
       } catch {
         stop(); reportCaptureIssue(stage);

@@ -18,7 +18,7 @@ import {
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { closeAudioContext, connectAudioGraph, disconnectAudioGraph, resumeAudioContext, type AudioGraph } from "@/lib/audio-session";
-import { encodePcm16, mergeAssemblyTranscript, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
+import { encodePcm16, mergeAssemblyTranscript, parseAssemblyMessageType, parseAssemblyTurn, type TranscriptState } from "@/lib/assembly-stream";
 import { replaceTranscriptAfterManualEdit, shouldAcceptCaptureMessage } from "@/lib/capture-session";
 import { localDateKey } from "@/lib/thought-timeline";
 import { splitTranscriptForReading } from "@/lib/transcript-display";
@@ -246,21 +246,37 @@ export default function Home() {
       const webSocket = new WebSocket(session.data.url);
       stream.current = mediaStream;
       socket.current = webSocket;
-      webSocket.onmessage = (event) => {
-        if (!shouldAcceptCaptureMessage(captureRun.current, run)) return;
-        const expectedLanguage = locale === "zh-CN" ? "cn" : "en";
-        transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), expectedLanguage);
-        setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
+      let started = false;
+      let failed = false;
+      const failStreaming = () => {
+        if (failed || socket.current !== webSocket) return;
+        failed = true;
+        stopRecording();
+        reportCaptureIssue("streaming");
       };
-      webSocket.onerror = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
-      webSocket.onclose = () => { if (socket.current === webSocket) reportCaptureIssue("streaming"); };
-      webSocket.onopen = () => {
-        if (captureRun.current !== run) { webSocket.close(); mediaStream.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
+      const startAudio = () => {
+        if (started || captureRun.current !== run) return;
+        started = true;
         graph.current = connectAudioGraph(context, mediaStream, (samples, sampleRate) => {
           if (webSocket.readyState === WebSocket.OPEN) webSocket.send(encodePcm16(samples, sampleRate));
         });
         setVoiceCaptured(true);
         setRecording(true);
+      };
+      const handshakeTimeout = window.setTimeout(failStreaming, 5000);
+      webSocket.onmessage = (event) => {
+        if (!shouldAcceptCaptureMessage(captureRun.current, run)) return;
+        const messageType = parseAssemblyMessageType(event.data);
+        if (messageType === "Error") { window.clearTimeout(handshakeTimeout); failStreaming(); return; }
+        if (messageType === "Begin") { window.clearTimeout(handshakeTimeout); startAudio(); return; }
+        const expectedLanguage = locale === "zh-CN" ? "cn" : "en";
+        transcript.current = mergeAssemblyTranscript(transcript.current, parseAssemblyTurn(event.data), expectedLanguage);
+        setDraft(`${transcript.current.confirmed}${transcript.current.live}`);
+      };
+      webSocket.onerror = failStreaming;
+      webSocket.onclose = failStreaming;
+      webSocket.onopen = () => {
+        if (captureRun.current !== run) { webSocket.close(); mediaStream.getTracks().forEach((track) => track.stop()); void closeAudioContext(context); return; }
       };
     } catch {
       stopRecording();

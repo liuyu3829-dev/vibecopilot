@@ -139,6 +139,15 @@ describe("bundled desktop orb shell", () => {
     expect(page).toContain('console.warn("[thought-space][desktop-capture]"');
   });
 
+  it("waits for the AssemblyAI Begin handshake before sending native orb audio", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain('messageType === "Begin"');
+    expect(page).toContain('startAudio(); return;');
+    expect(page.indexOf("const startAudio =")).toBeLessThan(page.indexOf("webSocket.onmessage"));
+    expect(page).toContain("window.setTimeout(failStreaming, 5000)");
+  });
+
   it("requires a valid paired desktop session before recording or saving", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
