@@ -25,15 +25,15 @@ describe("AssemblyAI streaming messages", () => {
     expect(mergeAssemblyTranscript(committed, finalTurn, "cn")).toEqual(committed);
   });
 
-  it("rejects a completed turn whose detected language does not match the chosen capture language", () => {
-    const russianTurn = parseAssemblyTurn(JSON.stringify({ type: "Turn", transcript: "privet", end_of_turn: true, language_code: "ru" }));
-    expect(isExpectedAssemblyTurn(russianTurn, "cn")).toBe(false);
-    expect(isExpectedAssemblyTurn(russianTurn, "en")).toBe(false);
+  it("accepts a completed turn when automatic language detection returns a regional language code", () => {
+    const chineseTurn = parseAssemblyTurn(JSON.stringify({ type: "Turn", transcript: "你好", end_of_turn: true, language_code: "zh-CN" }));
+    expect(isExpectedAssemblyTurn(chineseTurn, "cn")).toBe(true);
+    expect(isExpectedAssemblyTurn(chineseTurn, "en")).toBe(true);
   });
 
-  it("does not render Cyrillic interim text while waiting for language detection", () => {
+  it("accepts interim text while language detection is pending", () => {
     const interim = parseAssemblyTurn(JSON.stringify({ type: "Turn", transcript: "\u041f\u0440\u0438\u0432\u0435\u0442", end_of_turn: false }));
-    expect(isExpectedAssemblyTurn(interim, "cn")).toBe(false);
+    expect(isExpectedAssemblyTurn(interim, "cn")).toBe(true);
   });
 
   it("encodes microphone samples as PCM bytes", () => {

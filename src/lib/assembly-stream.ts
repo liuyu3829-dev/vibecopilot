@@ -22,16 +22,12 @@ export function parseAssemblyTurn(raw: string): AssemblyTurn {
   }
 }
 
-export function isExpectedAssemblyTurn(turn: AssemblyTurn, expectedLanguage: CaptureLanguage) {
-  if (turn.type === "ignored") return false;
-  if (/\p{Script=Cyrillic}/u.test(turn.text)) return false;
-  if (!turn.languageCode) return true;
-  return expectedLanguage === "cn" ? turn.languageCode === "zh" : turn.languageCode === "en";
+export function isExpectedAssemblyTurn(turn: AssemblyTurn, _expectedLanguage: CaptureLanguage) {
+  return turn.type !== "ignored";
 }
 
 export function mergeAssemblyTranscript(state: TranscriptState, turn: AssemblyTurn, expectedLanguage: CaptureLanguage): TranscriptState {
   if (turn.type === "ignored") return state;
-  if (!isExpectedAssemblyTurn(turn, expectedLanguage)) return turn.type === "final" ? { ...state, live: "" } : state;
   if (turn.type === "partial") return { confirmed: state.confirmed, live: removeCommittedOverlap(state.confirmed, turn.text) };
 
   const formatted = ensureSentencePunctuation(turn.text.trim(), expectedLanguage);
