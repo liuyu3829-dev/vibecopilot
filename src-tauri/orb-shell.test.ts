@@ -24,6 +24,14 @@ describe("bundled desktop orb shell", () => {
     expect(existsSync(resolve(process.cwd(), "public/orb-shell/index.html"))).toBe(true);
   });
 
+  it("uses a fully transparent native background around the idle orb", () => {
+    const source = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(source).toContain(".background_color(Color(0, 0, 0, 0))");
+    expect(page).toContain("background:transparent !important");
+  });
+
   it("contains a draggable ball and a visible recording control", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
 
@@ -149,6 +157,15 @@ describe("bundled desktop orb shell", () => {
     expect(page).toContain('new AudioWorkletNode(audioContext, "pcm-capture")');
   });
 
+  it("only renders Chinese or English AssemblyAI transcript turns in the raw orb", () => {
+    const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
+
+    expect(page).toContain("function isSupportedTranscriptTurn(turn)");
+    expect(page).toContain("turn.language_code ?? turn.languageCode");
+    expect(page).toContain("/^(zh|en)(?:[-_]|$)/i");
+    expect(page).toContain("if (!isSupportedTranscriptTurn(turn)) return;");
+  });
+
   it("requires a valid paired desktop session before recording or saving", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
@@ -160,14 +177,16 @@ describe("bundled desktop orb shell", () => {
     expect(native).toContain("fn clear_token()");
   });
 
-  it("routes Thought Space API calls through the native HTTPS bridge", () => {
+  it("routes Thought Space API calls through the WebView network transport", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
 
-    expect(page).toContain('invoke("desktop_api_request"');
-    expect(page).not.toContain('fetch(`${apiOrigin}/api/thoughts`');
-    expect(native).toContain("async fn desktop_api_request(");
-    expect(native).toContain("fn desktop_api_url(path: &str)");
+    expect(page).toContain('const apiOrigin = await invoke("api_origin");');
+    expect(page).toContain('fetch(`${apiOrigin}${path}`, {');
+    expect(page).toContain("headers.Authorization = desktopToken;");
+    expect(page).not.toContain('invoke("desktop_api_request"');
+    expect(native).not.toContain("async fn desktop_api_request(");
+    expect(native).not.toContain("fn desktop_api_url(path: &str)");
   });
 
   it("gives installed users a network hint instead of asking them to start a local web service", () => {
@@ -184,12 +203,13 @@ describe("bundled desktop orb shell", () => {
     expect(page).toContain('stage: "desktop_api"');
   });
 
-  it("uses the Windows system proxy configuration and surfaces native connection errors", () => {
+  it("uses the WebView transport and surfaces safe connection errors", () => {
     const page = readFileSync(resolve(process.cwd(), "public/orb-shell/index.html"), "utf8");
     const native = readFileSync(resolve(process.cwd(), "src-tauri/src/lib.rs"), "utf8");
+    const manifest = readFileSync(resolve(process.cwd(), "src-tauri/Cargo.toml"), "utf8");
 
-    expect(native).toContain("reqwest::Client::builder().build()");
-    expect(native).not.toContain("reqwest::Client::builder().no_proxy().build()");
+    expect(native).not.toContain("reqwest::");
+    expect(manifest).not.toContain("reqwest =");
     expect(page).toContain("catch (error)");
     expect(page).toContain("error instanceof Error ? error.message");
   });

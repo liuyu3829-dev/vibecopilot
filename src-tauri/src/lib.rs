@@ -9,9 +9,10 @@ use std::{
 };
 
 use keyring::Entry;
-use reqwest::Method;
-use serde::Serialize;
-use tauri::{AppHandle, LogicalSize, Manager, Size, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+  window::Color, AppHandle, LogicalSize, Manager, Size, State, WebviewUrl, WebviewWindow,
+  WebviewWindowBuilder,
+};
 use tauri_plugin_deep_link::DeepLinkExt;
 use url::Url;
 
@@ -29,12 +30,6 @@ struct PendingTicket(Mutex<Option<String>>);
 enum OrbAction {
   Show(Option<String>, Option<String>),
   Hide(Option<String>),
-}
-
-#[derive(Serialize)]
-struct DesktopApiResponse {
-  status: u16,
-  body: String,
 }
 
 fn position_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -87,6 +82,7 @@ fn open_orb(app: &AppHandle, ticket: Option<String>, control_secret: Option<Stri
     .title("Thought Space")
     .inner_size(IDLE_WIDTH, IDLE_HEIGHT)
     .transparent(true)
+    .background_color(Color(0, 0, 0, 0))
     .decorations(false)
     .shadow(false)
     .always_on_top(true)
@@ -164,43 +160,6 @@ fn default_api_origin(debug: bool) -> &'static str {
 
 fn api_origin_value() -> String {
   option_env!("THOUGHT_SPACE_API_ORIGIN").unwrap_or(default_api_origin(cfg!(debug_assertions))).trim_end_matches('/').to_string()
-}
-
-fn desktop_api_url(path: &str) -> Result<String, String> {
-  if !path.starts_with("/api/") {
-    return Err("Desktop requests must target Thought Space APIs.".to_string());
-  }
-  Ok(format!("{}{}", api_origin_value(), path))
-}
-
-#[tauri::command]
-async fn desktop_api_request(
-  path: String,
-  method: String,
-  body: Option<String>,
-  authorization: Option<String>,
-) -> Result<DesktopApiResponse, String> {
-  let method = match method.as_str() {
-    "GET" => Method::GET,
-    "POST" => Method::POST,
-    _ => return Err("Unsupported desktop request method.".to_string()),
-  };
-  // Use the operating system's proxy configuration when one is present, just
-  // like the browser that the user used to open Thought Space.
-  let client = reqwest::Client::builder().build()
-    .map_err(|error| format!("Unable to prepare Thought Space connection: {error}"))?;
-  let mut request = client.request(method, desktop_api_url(&path)?)
-    .header("Accept", "application/json");
-  if let Some(authorization) = authorization {
-    request = request.header("Authorization", authorization);
-  }
-  if let Some(body) = body {
-    request = request.header("Content-Type", "application/json").body(body);
-  }
-  let response = request.send().await.map_err(|error| format!("Unable to reach Thought Space: {error}"))?;
-  let status = response.status().as_u16();
-  let body = response.text().await.map_err(|error| format!("Unable to read Thought Space response: {error}"))?;
-  Ok(DesktopApiResponse { status, body })
 }
 
 fn allowed_control_origin(origin: &str) -> bool {
@@ -385,7 +344,7 @@ pub fn run() {
       }
       Ok(())
     })
-  .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin, desktop_api_request])
+  .invoke_handler(tauri::generate_handler![resize_orb, begin_drag, close_orb, read_token, store_token, clear_token, take_launch_ticket, api_origin])
     .run(tauri::generate_context!())
     .expect("error while running Thought Space Orb");
 }

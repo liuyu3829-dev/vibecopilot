@@ -102,14 +102,16 @@
     let desktopToken = null;
 
     async function desktopApi(path, options = {}) {
-      const response = await invoke("desktop_api_request", {
-        path,
+      const apiOrigin = await invoke("api_origin");
+      const headers = { Accept: "application/json" };
+      if (desktopToken) headers.Authorization = desktopToken;
+      if (options.body) headers["Content-Type"] = "application/json";
+      const response = await fetch(`${apiOrigin}${path}`, {
         method: options.method || "GET",
-        body: options.body || null,
-        authorization: desktopToken,
+        headers,
+        body: options.body || undefined,
       });
-      let data = null;
-      try { data = JSON.parse(response.body); } catch {}
+      const data = await response.json().catch(() => null);
       return { ok: response.status >= 200 && response.status < 300, status: response.status, data };
     }
     async function refreshDesktopSession() {
@@ -232,12 +234,19 @@
       hint.textContent = transcript.value.trim() ? "继续说话以追加内容，或保存当前记录。" : "点击开始说话，即可实时记录你的想法。";
       renderCaptureControls();
     }
+    function isSupportedTranscriptTurn(turn) {
+      const language = turn.language_code ?? turn.languageCode;
+      if (typeof language === "string" && !/^(zh|en)(?:[-_]|$)/i.test(language)) return false;
+
+      return /^[\p{Script=Han}\p{Script=Latin}0-9\s\p{P}]+$/u.test(turn.transcript);
+    }
+
     function addTurn(message, activeRun) {
       if (captureRun !== activeRun) return;
       try {
         const turn = JSON.parse(message.data);
         if (turn.type !== "Turn" || !turn.transcript) return;
-        if (/[Ѐ-ӿ]/.test(turn.transcript)) return;
+        if (!isSupportedTranscriptTurn(turn)) return;
         if (turn.end_of_turn) {
           const value = turn.transcript.trim();
           if (value && !confirmed.replace(/[\s,.!?，。！？]/g,"").endsWith(value.replace(/[\s,.!?，。！？]/g,""))) {
