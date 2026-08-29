@@ -1,5 +1,7 @@
 # Report curation and tag clarity
 
+> 历史设计记录：保留当时的决策背景，不代表当前实现。
+
 ## Goal
 
 Make tags and report source selection understandable without changing capture, desktop-orb, storage, or existing report snapshots.

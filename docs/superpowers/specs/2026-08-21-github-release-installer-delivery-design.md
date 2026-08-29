@@ -1,5 +1,7 @@
 # GitHub Release installer delivery
 
+> 历史设计记录：保留当时的决策背景，不代表当前实现。当前发布方式见 [`docs/current-architecture-and-release-status.md`](../../current-architecture-and-release-status.md)。
+
 ## Goal
 
 Let any visitor download the public Windows desktop-orb installer without a Cloudflare account, payment method, invite code, or R2 credentials. Keep the installed orb's pairing, local show/hide bridge, recording, and Supabase data flow unchanged.

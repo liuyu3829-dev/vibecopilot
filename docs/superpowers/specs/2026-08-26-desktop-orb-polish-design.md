@@ -1,5 +1,7 @@
 # Desktop Orb 0.1.9 Polish Design
 
+> 历史设计记录：该版本范围已经完成；本文保留为验收背景，不代表后续迭代计划。
+
 ## Scope
 
 This release polishes the already-working desktop orb without changing its microphone capture, WebView API transport, AssemblyAI session flow, or web Show/Hide protocol.

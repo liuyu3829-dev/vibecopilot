@@ -1,5 +1,7 @@
 # Desktop orb WebView API transport
 
+> 历史设计记录：本文描述的 WebView `fetch` 修复已在当前生产实现中生效；后续架构事实见 [`docs/current-architecture-and-release-status.md`](../../current-architecture-and-release-status.md)。
+
 ## Problem
 
 The web application reaches the production site, but Windows direct HTTPS requests to

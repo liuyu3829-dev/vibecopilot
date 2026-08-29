@@ -4,7 +4,7 @@
 
 Before extending the product, read [the feature-boundaries contract](docs/feature-boundaries.md). It freezes the accepted desktop orb, real-time capture, storage, and API behavior, and defines how future calendar/journal and login work must remain isolated.
 
-Thought Space captures live spoken thoughts with AssemblyAI, analyzes them with DeepSeek, and stores each signed-in user鈥檚 data in Supabase.
+Thought Space captures live spoken thoughts with AssemblyAI, creates user-selected daily writing with DeepSeek, and stores each signed-in user’s data in Supabase. The current release is **0.1.9**. For the authoritative production architecture and release state, read [current architecture and release status](docs/current-architecture-and-release-status.md).
 
 ## Local development
 
@@ -35,8 +35,8 @@ Create a public GitHub Release and upload the generated `Thought Space_*.exe` as
 
 The Windows orb uses Tauri and Windows WebView2 rather than Electron. During local development, start the web service first and then run `npm run desktop:dev`. This is only a developer workflow.
 
-The production Windows installer uses the `thoughtspace://` protocol and connects the orb to the deployed HTTPS Thought Space API. It does not launch a terminal, local Next server, or local SQLite database. Build with `THOUGHT_SPACE_API_ORIGIN` set to the deployed HTTPS app URL. The final product is a normal Windows installer; users do not install Rust, Node.js, or developer tools.
+The production Windows installer uses the `thoughtspace://` protocol and connects the orb to the deployed HTTPS Thought Space API through its WebView. It does not launch a terminal, local Next server, or local SQLite database. Build with `THOUGHT_SPACE_API_ORIGIN` set to the stable deployed HTTPS app URL. The final product is a normal Windows installer; users do not install Rust, Node.js, or developer tools.
 
 ## Curated daily reports
 
-Daily reports are immutable, date-based snapshots. A thought is included by default; clear its **Daily report** checkbox to exclude it from the next report. The report generator uses only the selected thoughts from the Shanghai calendar date and saves their IDs, times, and original text as evidence. Chinese and English reports are stored independently. Existing legacy report modes remain in the database for compatibility, but the current interface creates one adaptive report per date and output language.
+Daily reports are immutable, date-based snapshots. A thought is included by default; clear its **Daily report** checkbox to exclude it from the next report. The report generator uses only the selected thoughts from the Shanghai calendar date and saves their IDs, times, and original text as evidence. Chinese and English reports are stored independently. Existing legacy report modes remain readable for compatibility.

@@ -1,7 +1,8 @@
 import { createClient, type Client } from "@libsql/client";
 import { randomUUID } from "node:crypto";
 
-export type ReportMode = "short_essay" | "post";
+// `post` is retained only so reports created before the three-mode redesign stay readable.
+export type ReportMode = "short_essay" | "casual_post" | "opinion_post" | "post";
 export type ReportEvidence = { thoughtId: string; capturedAt: string; transcript: string };
 
 export type DailyReport = {
@@ -30,9 +31,13 @@ export type ReportStore = {
   close(): Promise<void>;
 };
 
+function reportMode(value: unknown): ReportMode {
+  return value === "casual_post" || value === "opinion_post" || value === "post" ? value : "short_essay";
+}
+
 function toReport(row: Record<string, unknown>): DailyReport {
   return {
-    id: String(row.id), ownerId: String(row.owner_id), date: String(row.date), locale: row.locale as DailyReport["locale"], mode: row.mode === "post" ? "post" : "short_essay",
+    id: String(row.id), ownerId: String(row.owner_id), date: String(row.date), locale: row.locale as DailyReport["locale"], mode: reportMode(row.mode),
     markdown: String(row.markdown ?? `# ${String(row.theme)}\n\n${String(row.narrative)}`),
     theme: String(row.theme), narrative: String(row.narrative), insights: JSON.parse(String(row.insights)) as string[], evidence: JSON.parse(String(row.evidence ?? "[]")) as ReportEvidence[],
     sourceThoughtCount: Number(row.source_thought_count), generatedAt: String(row.generated_at),

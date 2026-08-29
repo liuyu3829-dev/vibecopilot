@@ -1,5 +1,7 @@
 # Desktop Orb Core Contract v1
 
+> 当前实现说明（0.1.9）：网页通过 `thoughtspace://open-orb` 与 `thoughtspace://hide-orb` 深链请求已安装的应用显示或隐藏窗口。本文不再使用 loopback 控制桥模型。
+
 This document freezes the desktop orb behavior accepted on 2026-08-06. Changes to the desktop orb must keep every item below true.
 
 For project-wide ownership, API, data, and future calendar/login isolation rules, see [Feature boundaries](feature-boundaries.md).
@@ -16,8 +18,8 @@ For project-wide ownership, API, data, and future calendar/login isolation rules
 ## Technical boundary
 
 - The desktop app is the only owner of native window visibility, dragging, and size.
-- The web dashboard uses the authenticated loopback control bridge to show or hide an already-running orb; it does not create a second desktop window.
-- `thoughtspace://open-orb` is reserved for a first launch or a fully exited desktop app, where Windows may require the browser to confirm the native launch.
+- The web dashboard uses authenticated `thoughtspace://open-orb` and `thoughtspace://hide-orb` deep links to show or hide an installed orb; it does not create a second desktop window.
+- `thoughtspace://open-orb` can start a fully exited installed app or focus a hidden running app. Windows may require the browser to confirm a native launch.
 - The desktop app keeps its current process alive while hidden, so opening a hidden orb is a show/focus operation rather than an application launch.
 - Real-time transcription and saving continue to use the existing `/api/speech/session` and `/api/thoughts` paths.
 

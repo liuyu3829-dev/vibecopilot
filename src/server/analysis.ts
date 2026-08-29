@@ -3,8 +3,22 @@ import type { ReportMode } from "./report-store";
 
 export type PostLengthPreference = "short" | "adaptive" | "long";
 
+type MaterialDecision = { selectedThoughtIds: string[]; focus?: string; coreTheme?: string; chronology?: string; omittedThoughtIds?: string[] };
+
+function isThoughtIdList(value: unknown, expected: Set<string>): value is string[] {
+  return Array.isArray(value) && value.every((id) => typeof id === "string" && expected.has(id)) && new Set(value).size === value.length;
+}
+
 function coversEveryThought(ids: unknown, expected: Set<string>) {
-  return Array.isArray(ids) && ids.length === expected.size && ids.every((id) => typeof id === "string" && expected.has(id)) && new Set(ids).size === expected.size;
+  return isThoughtIdList(ids, expected) && ids.length === expected.size;
+}
+
+function isMaterialDecision(value: Record<string, unknown>, thoughtIds: Set<string>, mode: ReportMode): value is MaterialDecision {
+  const selectedThoughtIds = value.selectedThoughtIds;
+  if (!isThoughtIdList(selectedThoughtIds, thoughtIds) || selectedThoughtIds.length === 0) return false;
+  if (mode === "short_essay" && !coversEveryThought(selectedThoughtIds, thoughtIds)) return false;
+  return ["focus", "coreTheme", "chronology"].every((key) => value[key] === undefined || typeof value[key] === "string")
+    && (value.omittedThoughtIds === undefined || isThoughtIdList(value.omittedThoughtIds, thoughtIds));
 }
 
 async function deepSeekJson(prompt: string) {
@@ -28,32 +42,40 @@ export async function analyzeThought(thought: Thought) {
   return { summary: analysis.summary.trim(), tags: [] };
 }
 
-export async function analyzeDailyReport(thoughts: Thought[], locale: "zh-CN" | "en", mode: ReportMode = "short_essay", lengthPreference: PostLengthPreference = "adaptive") {
+export async function analyzeDailyReport(thoughts: Thought[], locale: "zh-CN" | "en", mode: ReportMode = "short_essay", _legacyLengthPreference: PostLengthPreference = "adaptive") {
   if (thoughts.length === 0) return null;
+  if (mode === "post") throw new Error("LEGACY_REPORT_MODE");
   const language = locale === "zh-CN" ? "Simplified Chinese" : "English";
   const orderedThoughts = [...thoughts].sort((left, right) => left.capturedAt.localeCompare(right.capturedAt));
   const sourceText = orderedThoughts.map((thought) => `- id:${thought.id} | ${thought.capturedAt}\n${thought.transcript}`).join("\n\n");
-  const outline = await deepSeekJson(`Return JSON only: {claim:string,points:Array<{point:string,thoughtIds:string[]}>,reservation:string}. Write in ${language}.
-Build an evidence outline before any prose. Use only the supplied source thoughts. claim is a specific central judgement, not a slogan. Each point must name a concrete line of reasoning and cite one or more thoughtIds from the source. reservation records the important uncertainty or limitation. Do not invent events, emotions, people, actions, outcomes, or causal links. Do not write the daily report yet.
-Source thoughts, in capture order:\n${sourceText}`);
   const thoughtIds = new Set(orderedThoughts.map((thought) => thought.id));
-  const citedThoughtIds = Array.isArray(outline.points) ? outline.points.flatMap((point) => typeof point === "object" && point !== null ? (point as Record<string, unknown>).thoughtIds as unknown[] ?? [] : []) : [];
-  if (typeof outline.claim !== "string" || !Array.isArray(outline.points) || !outline.points.every((point) => typeof point === "object" && point !== null && typeof (point as Record<string, unknown>).point === "string" && Array.isArray((point as Record<string, unknown>).thoughtIds) && ((point as Record<string, unknown>).thoughtIds as unknown[]).every((id) => typeof id === "string" && thoughtIds.has(id))) || !coversEveryThought([...new Set(citedThoughtIds)], thoughtIds)) throw new Error("DEEPSEEK_INVALID_RESPONSE");
-  const postLength = lengthPreference === "short"
-    ? "Use the short preference: usually 180–380 Chinese characters, while growing only when needed to cover every distinct selected point."
-    : lengthPreference === "long"
-      ? "Use the long preference: usually 600–1,400 Chinese characters, with room for concrete turns in the reasoning but without becoming a meeting log."
-      : "Use the adaptive preference: let the number, density, and distinctness of selected thoughts determine the length; a few simple thoughts stay short, while several substantial thoughts receive enough room to be understood.";
-  const style = mode === "post"
-    ? `Write a single first-person post from the evidence outline and supplied thoughts. ${postLength} Every selected thought has a distinct core point: absorb every one of them, combining related points naturally instead of listing or quoting thoughts in capture order. Do not omit a distinct point merely to keep the post short. Do not use Markdown, a title, hashtags, a call to action, a generic hook, a lesson, therapy language, slogans, or polished conclusions. Do not invent events, emotions, facts, people, actions, outcomes, or connections.`
-    : "Write an Opinion short essay from the evidence outline and the supplied thoughts. Make a clear but modest judgement, then develop only the two or three source-grounded reasons needed to support it. Use one to three light Markdown level-two headings only when they clarify a real turn in the argument. Do not add a Markdown title. Do not narrate every source thought in order, repeat long phrases, manufacture balance, or turn the note into a diary, a lesson, or therapy language. Do not invent events, emotions, facts, people, actions, outcomes, or connections. Avoid slogans, generic motivation, AI self-reference, and polished conclusions. Preserve uncertainty when the outline does not resolve it. With little material, keep the result short.";
-  const report = await deepSeekJson(`Return JSON only: {markdown:string,preview:string${mode === "post" ? ",coveredThoughtIds:string[]" : ""}}. Write in ${language}.
-${style} preview is one plain, source-grounded sentence.
-Evidence outline:\n${JSON.stringify(outline)}
+  const shortMaterial = Array.from(orderedThoughts.map((thought) => thought.transcript).join("\n")).length <= 200;
+  const materialInstructions = mode === "casual_post"
+    ? "Casual post: choose one substantial line of thought. Keep its original voice; scattered material does not need to be forced together. Return {selectedThoughtIds:string[],focus:string}."
+    : mode === "opinion_post"
+      ? "Opinion post: choose one strongest theme and the source thoughts that support it. You may omit peripheral thoughts instead of inventing a connection. Return {selectedThoughtIds:string[],coreTheme:string,omittedThoughtIds:string[]}."
+      : "Diary: include every supplied thought in its natural capture order. A diary may contain separate threads and pauses; do not force a central theme or causal relationship. Return {selectedThoughtIds:string[],chronology:string}.";
+  const material = await deepSeekJson(`Return JSON only. Write in ${language}.
+Make a material decision before writing prose. ${materialInstructions}
+Use only supplied source thoughts. Do not invent events, emotions, people, relationships, actions, outcomes, causes, conclusions, or identity experiences. Do not write the report yet.
+Source thoughts, in capture order:\n${sourceText}`);
+  if (!isMaterialDecision(material, thoughtIds, mode)) throw new Error("DEEPSEEK_INVALID_RESPONSE");
+  const sharedRules = `Use only the supplied thoughts and material decision. Do not invent events, emotions, people, relationships, facts, actions, outcomes, causal links, conclusions, or personal experience. Do not use a generic hook, slogan, teaching tone, AI self-reference, title, heading, numbered list, hashtag, call to action, repeated summary, formulaic ending, or question to the reader. Use natural short paragraphs, not an outline. End on a natural judgement or aftertaste without forcing a summary, reversal, or question. preview is one plain source-grounded sentence.`;
+  const shortMaterialRule = shortMaterial ? "This is light organization: preserve the original meaning and recognisable short phrases, adding only needed links, gentle grammar repair, and natural line breaks; do not turn it into a long piece." : "Let material density determine the length. Distil long material instead of expanding every detail.";
+  const style = mode === "casual_post"
+    ? "Write a concise, relaxed chat-like casual post. Be direct and human, never padded. Use first person only when the source actually contains a personal position or experience. Lightly repair broken sentences and repetition while retaining the original tone."
+    : mode === "opinion_post"
+      ? "Write an opinion post around one strongest theme with only the small supporting points it needs. The judgement must be supported by the source, never presented as research, a universal law, or expert fact. You may omit peripheral thoughts; do not force them into the piece. Be clear without sounding like an expert article or social-media template."
+      : "Write a private first-person diary that follows the day naturally. Multiple unrelated thoughts may remain separate. Do not impose a thesis, causal explanation, or emotion that the source does not contain.";
+  const report = await deepSeekJson(`Return JSON only: {markdown:string,preview:string}. Write in ${language}.
+${style}
+${shortMaterialRule}
+${sharedRules}
+Material decision:\n${JSON.stringify(material)}
 Source thoughts:\n${sourceText}`);
   if (typeof report.markdown !== "string" || typeof report.preview !== "string") throw new Error("DEEPSEEK_INVALID_RESPONSE");
   const markdown = report.markdown.trim();
   const preview = report.preview.trim();
-  if (markdown.length < 2 || !preview || (mode === "post" && (markdown.includes("#") || !coversEveryThought(report.coveredThoughtIds, thoughtIds)))) throw new Error("DEEPSEEK_INVALID_RESPONSE");
+  if (markdown.length < 2 || !preview) throw new Error("DEEPSEEK_INVALID_RESPONSE");
   return { markdown, preview };
 }

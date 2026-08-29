@@ -1,5 +1,7 @@
 # WebView Desktop Production Debugging Skill Design
 
+> 历史设计记录：对应通用 skill 已创建；本文保留为设计证据，不代表 Thought Space 当前实现。
+
 ## Goal
 
 Create a reusable personal Codex skill for debugging and releasing products that combine a web application with a Tauri, Electron, or other WebView-based desktop companion. It must help separate browser, WebView, native, network, packaging, and release failures without tying the workflow to Thought Space or a specific speech provider.

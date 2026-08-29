@@ -1,5 +1,7 @@
 # Public Desktop Orb Download and Control Design
 
+> 历史设计记录：保留当时的决策背景，不代表当前实现。当前控制方式已改为 `thoughtspace://` 深链。
+
 ## Goal
 
 Ship Thought Space Orb as a normal Windows companion app for every visitor of the deployed Thought Space website. Installing the companion must not require Node.js, Rust, a terminal, a local Next.js service, an invite code, or developer tools.

@@ -9,7 +9,8 @@ type ThoughtRow = { id: string; owner_id: string; transcript: string; source: Th
 type ReportRow = { id: string; owner_id: string; date: string; locale: DailyReport["locale"]; mode: DailyReport["mode"]; markdown: string; theme: string; narrative: string; insights: string[]; evidence?: DailyReport["evidence"]; source_thought_count: number; generated_at: string };
 
 const toThought = (row: ThoughtRow): Thought => ({ id: row.id, ownerId: row.owner_id, transcript: row.transcript, source: row.source, language: row.language, capturedAt: row.captured_at, capturedDay: row.captured_day ?? shanghaiDateKey(row.captured_at), updatedAt: row.updated_at, summary: row.summary, tags: row.tags ?? [], personalTags: row.personal_tags ?? [], reportIncluded: row.report_included ?? true, analysisStatus: row.analysis_status, deletedAt: row.deleted_at });
-const toReport = (row: ReportRow): DailyReport => ({ id: row.id, ownerId: row.owner_id, date: row.date, locale: row.locale, mode: row.mode === "post" ? "post" : "short_essay", markdown: row.markdown ?? row.narrative, theme: row.theme, narrative: row.narrative, insights: row.insights ?? [], evidence: row.evidence ?? [], sourceThoughtCount: row.source_thought_count, generatedAt: row.generated_at });
+const reportMode = (value: unknown): DailyReport["mode"] => value === "casual_post" || value === "opinion_post" || value === "post" ? value : "short_essay";
+const toReport = (row: ReportRow): DailyReport => ({ id: row.id, ownerId: row.owner_id, date: row.date, locale: row.locale, mode: reportMode(row.mode), markdown: row.markdown ?? row.narrative, theme: row.theme, narrative: row.narrative, insights: row.insights ?? [], evidence: row.evidence ?? [], sourceThoughtCount: row.source_thought_count, generatedAt: row.generated_at });
 
 function fail(error: { message: string } | null) { if (error) throw new Error(error.message); }
 
